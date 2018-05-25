@@ -26,8 +26,13 @@ and prototyping algorithms on images, geometry or sound.
   per-frame execution or a background processing pipeline that gets regular
   updates for rendering into the viewport
 * 3️⃣ Simple APIs for common areas such as 2D and 3D visualization (and
-  navigation), Audio playback, image and video export, etc.
+  navigation), Audio playback, Graph plotting, image and video export, etc.
 * 4️⃣ Better code editor
+
+__Things to Consider__
+
+* NumPy <-> OpenGL exchange (eg. [pygarrayimage](http://code.astraw.com/projects/motmot/pygarrayimage.html))
+* Numba (need explicit support, maybe.?)
 
 # Vizardry Documentation
 
