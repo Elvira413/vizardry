@@ -22,8 +22,42 @@
 from . import gl
 from .parameters import ParameterPaneManager
 
+import contextlib
 import time
 import traceback
+
+
+class BaseGLContext:
+  """
+  Interface that represents a GL context.
+  """
+
+  def __init__(self):
+    self.resources = gl.ResourceManager()
+
+  def __enter__(self):
+    self._stack = contextlib.ExitStack()
+    self._stack.enter_context(self.resources.set_current())
+    self._set_current()
+    self._stack.callback(self._disable)
+
+  def __exit__(self, *args):
+    return self._stack.__exit__(*args)
+
+  def destroy(self):
+    self._set_current()
+    self.resources.release()
+    self._disable()
+    self._destroy()
+
+  def _set_current(self):
+    raise NotImplementedError
+
+  def _disable(self):
+    raise NotImplementedError
+
+  def _destroy(self):
+    raise NotImplementedError
 
 
 class BaseSceneNode:
@@ -97,8 +131,8 @@ class Scene:
   with the GL canvas.
   """
 
-  def __init__(self):
-    self.gl_resources = gl.ResourceManager()
+  def __init__(self, gl_context=None):
+    self.gl_context = gl_context
     self.nodes = []
     self.reset()
 
@@ -112,8 +146,8 @@ class Scene:
     self.start_time = time.clock()
 
   def event(self, __name, *args, **kwargs):
-    if __name == 'gl_flush':
-      self.gl_resources.release()
+    if self.gl_context and __name == 'gl_flush':
+      self.gl_context.resources.release()
     for node in self.nodes:
       try:
         getattr(node, __name)(*args, **kwargs)

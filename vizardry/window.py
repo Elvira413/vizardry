@@ -19,7 +19,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-from .scene import Scene
+from .scene import BaseGLContext, Scene
 
 import OpenGL.GL
 import traceback
@@ -95,21 +95,33 @@ class Viewport(wx.Panel):
 
   def _size_event(self, event):
     self.Show()
-    self.make_context_current()
-    size = self.canvas.GetClientSize()
-    OpenGL.GL.glViewport(0, 0, size.width, size.height)
-    self.scene.event('gl_resize', size)
-    self.canvas.Refresh(False)
-    event.Skip()
+    with self.scene.gl_context:
+      size = self.canvas.GetClientSize()
+      OpenGL.GL.glViewport(0, 0, size.width, size.height)
+      self.canvas.Refresh(False)
+      event.Skip()
 
   def _paint_event(self, event):
-    self.make_context_current()
-    self.scene.event('gl_paint')
-    self.canvas.SwapBuffers()
-    event.Skip()
+    with self.scene.gl_context:
+      self.scene.event('gl_paint')
+      self.canvas.SwapBuffers()
+      event.Skip()
 
-  def make_context_current(self):
-    self.canvas.SetCurrent(self.context)
+
+class ViewportGLContext(BaseGLContext):
+
+  def __init__(self, viewport):
+    super().__init__()
+    self._viewport = viewport
+
+  def _set_current(self):
+    self._viewport.canvas.SetCurrent(self._viewport.context)
+
+  def _disable(self):
+    pass
+
+  def _destroy(self):
+    pass
 
 
 class EditorPane(wx.Panel):
@@ -152,9 +164,8 @@ class EditorPane(wx.Panel):
 
   def _update(self):
     self.scene.reset()
-    self.GetParent().viewport.make_context_current()
-    self.scene.event('gl_flush')
-    with self.scene.gl_resources.set_current():
+    with self.scene.gl_context:
+      self.scene.event('gl_flush')
       try:
         code = compile(self.code.GetValue(), 'Vizardry', 'exec')
         scope = {'scene': self.scene}
@@ -177,12 +188,20 @@ class MainWindow(wx.Frame):
     self.settings_pane = EditorPane(self, self.scene)
     self.Bind(wx.EVT_TIMER, self._timer, self.timer)
 
+    self.scene.gl_context = ViewportGLContext(self.viewport)
+
     sizer = wx.BoxSizer(wx.HORIZONTAL)
     sizer.Add(self.viewport, 4, wx.EXPAND)
     sizer.Add(self.settings_pane, 3, wx.EXPAND)
     self.SetSizer(sizer)
 
     self.SetClientSize(1024, 512)
+    self.Bind(wx.EVT_CLOSE, self._close)
+
+  def _close(self, event):
+    self.scene.reset()
+    self.scene.gl_context.destroy()
+    event.Skip()
 
   def _timer(self, event):
     self.scene.event('update')
