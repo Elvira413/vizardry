@@ -12,16 +12,17 @@ and prototyping algorithms on images, geometry or sound.
 ## Current State
 
 * OpenGL Canvas on the left
-* A single code panel on the right allowing you to set the framerate and
-  render into the GL Canvas
+* The single "InlineNode" in the scene is editable in the "Edit" tab and
+  currently has only one parameter: The Python code text field
 
-![](https://i.imgur.com/lAfJFVR.png)
+![](https://i.imgur.com/bDHvWNd.png)
 
 ## Planned Features
 
-* 1️⃣ Node-based composition of components
-* 1️⃣ Support for node parameters (display, easy generation, serializable)
-* 1️⃣ Scene graph (serializable, 2️⃣ GUI to view and edit nodes)
+* 1️⃣ Node-based composition of components *(In progress...)*
+* 1️⃣ Support for node parameters (display, easy generation, serializable) *(In progress...)*
+* 2️⃣ Node-Editor to arrange and connect nodes
+* 2️⃣ Serializable scene graph
 * 2️⃣ Full control of processing pipeline &ndash; You may choose an automatic
   per-frame execution or a background processing pipeline that gets regular
   updates for rendering into the viewport
