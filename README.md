@@ -33,8 +33,18 @@ and prototyping algorithms on images, geometry or sound.
 
 __Table of Contents__
 
+* [GUI](#gui)
+  * [Editor](#editor)
 * [The Scene Graph](#the-scene-graph)
 * [GL Object API](#gl-object-api)
+
+## GUI
+
+### Editor
+
+The code editor in Vizardry is pretty basic at the moment. It is a
+`wx.TextCtrl` with rich-text capabilities and a CTRL+Return hotkey
+to commit the changes.
 
 ## The Scene Graph
 
