@@ -34,9 +34,10 @@ class Viewport(wx.Panel):
       wx.glcanvas.WX_GL_DOUBLEBUFFER,
       wx.glcanvas.WX_GL_DEPTH_SIZE, 24)
     self.canvas = wx.glcanvas.GLCanvas(self, attribList=gl_attribs)
-    self.canvas.Bind(wx.EVT_ERASE_BACKGROUND, self._erase_background)
-    self.canvas.Bind(wx.EVT_SIZE, self._size_event)
-    self.canvas.Bind(wx.EVT_PAINT, self._paint_event)
+    self.canvas.Bind(wx.EVT_ERASE_BACKGROUND, self.__erase_background)
+    self.canvas.Bind(wx.EVT_SIZE, self.__size_event)
+    self.canvas.Bind(wx.EVT_PAINT, self.__paint_event)
+    self.canvas.Bind(wx.EVT_RIGHT_DOWN, self.__right_click)
     self.context = wx.glcanvas.GLContext(self.canvas)
     self.scene = scene
 
@@ -44,25 +45,36 @@ class Viewport(wx.Panel):
     sizer.Add(self.canvas, 1, wx.EXPAND)
     self.SetSizer(sizer)
 
+
   def create_context(self):
     return ViewportGLContext(self.canvas, self.context)
 
-  def _erase_background(self, event):
+  def __erase_background(self, ev):
     pass  # Do nothing, to avoid flashing on Windows
 
-  def _size_event(self, event):
+  def __size_event(self, ev):
     self.Show()
     with self.scene.gl_context:
       size = self.canvas.GetClientSize()
       gl.glViewport(0, 0, size.width, size.height)
       self.canvas.Refresh(False)
-      event.Skip()
+      ev.Skip()
 
-  def _paint_event(self, event):
+  def __paint_event(self, ev):
     with self.scene.gl_context:
       self.scene.gl_render()
       self.canvas.SwapBuffers()
-      event.Skip()
+      ev.Skip()
+
+  def __right_click(self, ev):
+    menu = wx.Menu()
+    if self.scene.active_node:
+      self.scene.active_node.build_context_menu(menu)
+    if menu.GetMenuItemCount() > 0:
+      menu.AppendSeparator()
+    menu.Append(1, '&Save as Image ...')
+    sel = self.GetPopupMenuSelectionFromUser(menu)
+    # TODO: Implement Save as Image ...
 
 
 class ViewportGLContext(scene.BaseGLContext):

@@ -109,3 +109,10 @@ class BaseSceneNodeData:
     """
 
     return None
+
+  def build_context_menu(self, node, menu):
+    """
+    Extend the #wx.Menu.
+    """
+
+    pass

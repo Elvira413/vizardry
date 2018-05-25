@@ -330,6 +330,10 @@ class SceneNode:
   def get_icon(self):
     return self.data.get_icon(self)
 
+  def build_context_menu(self, menu):
+    if self.data:
+      self.data.build_context_menu(self, menu)
+
 
 class RootNode(SceneNode):
   """
