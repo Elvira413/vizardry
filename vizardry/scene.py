@@ -19,6 +19,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
+from . import gl
 from .parameters import ParameterPaneManager
 
 import time
@@ -97,8 +98,7 @@ class Scene:
   """
 
   def __init__(self):
-    self.gl_handles = []
-    self.old_gl_handles = []
+    self.gl_resources = gl.ResourceManager()
     self.nodes = []
     self.reset()
 
@@ -107,17 +107,13 @@ class Scene:
     return time.clock() - self.start_time
 
   def reset(self):
-    self.old_gl_handles += self.gl_handles
-    self.gl_handles.clear()
     self.nodes.clear()
     self.framerate = None
     self.start_time = time.clock()
 
   def event(self, __name, *args, **kwargs):
     if __name == 'gl_flush':
-      for handle, deleter in self.old_gl_handles:
-        deleter(handle)
-      self.old_gl_handles.clear()
+      self.gl_resources.release()
     for node in self.nodes:
       try:
         getattr(node, __name)(*args, **kwargs)
@@ -133,8 +129,3 @@ class Scene:
     node = node_type(name)
     self.nodes.append(node)
     return node
-
-  def gl_handle(self, handle, deleter):
-    assert callable(deleter)
-    self.gl_handles.append((handle, deleter))
-    return handle

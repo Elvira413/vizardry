@@ -19,48 +19,10 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
+"""
+Union of the GL, GLU and GLUT libraries.
+"""
+
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
-
-
-def vzSimpleProgram(fragment, vertex=None):
-  if not vertex:
-    vertex = '''
-      #version 330 core
-      layout(location = 0) in vec2 position;
-      out vec2 fragCoord;
-      void main() {
-        gl_Position = vec4(position, 0.0, 1.0);
-        fragCoord = (position + 1) * 0.5;
-      }
-    '''
-
-    shvert = glCreateShader(GL_VERTEX_SHADER)
-    glShaderSource(shvert, vertex)
-    glCompileShader(shvert)
-
-    shfrag = glCreateShader(GL_FRAGMENT_SHADER)
-    glShaderSource(shfrag, fragment)
-    glCompileShader(shfrag)
-
-    prog = glCreateProgram()
-    glAttachShader(prog, shvert)
-    glAttachShader(prog, shfrag)
-    glLinkProgram(prog)
-
-    glDetachShader(prog, shvert)
-    glDetachShader(prog, shfrag)
-
-    glDeleteShader(shvert)
-    glDeleteShader(shfrag)
-
-    # TODO: Reliably determine if the shader was linked successfully?
-    log = glGetProgramInfoLog(prog)
-    if log:
-      if hasattr(log, 'decode'): log = log.decode()
-      if 'error' in log:
-        raise RuntimeError(log)
-      print(log)
-
-    return prog

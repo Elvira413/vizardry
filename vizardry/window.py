@@ -27,30 +27,32 @@ import wx, wx.glcanvas
 
 
 DEFAULT_CODE = """
-from vizardry.gl import *
+from vizardry import gl
+from vizardry.gl.native import *
 scene.framerate = 50
 node = scene.create_node('basic')
 
 
-program = scene.gl_handle(vzSimpleProgram('''
-  #version 330 core
-  uniform float time;
-  in vec2 fragCoord;
-  out vec4 fragColor;
-  void main() {
-    vec2 c = fragCoord.xy;
-    c = c * vec2(4,3) - vec2(2.5, 1.5);
-    vec2 z = vec2(cos(time / 10), sin(time / 10));
-    fragColor = vec4(0);
-    for (int i = 0; i < 100; ++i) {
-      if (z.x * z.x + z.y * z.y >= 4.0) {
-        fragColor = vec4(1);
-        break;
-      }
-      z = vec2(z.x*z.x - z.y*z.y, 2.*z.x*z.y) + c;
+program = gl.Program.from_fragment(
+'''
+#version 330 core
+uniform float time;
+in vec2 fragCoord;
+out vec4 fragColor;
+void main() {
+  vec2 c = fragCoord.xy;
+  c = c * vec2(4,3) - vec2(2.5, 1.5);
+  vec2 z = vec2(cos(time / 10), sin(time / 10));
+  fragColor = vec4(0);
+  for (int i = 0; i < 100; ++i) {
+    if (z.x * z.x + z.y * z.y >= 4.0) {
+      fragColor = vec4(1);
+      break;
     }
+    z = vec2(z.x*z.x - z.y*z.y, 2.*z.x*z.y) + c;
   }
-'''), glDeleteProgram)
+}
+''')
 
 
 @node.hook
@@ -152,13 +154,14 @@ class EditorPane(wx.Panel):
     self.scene.reset()
     self.GetParent().viewport.make_context_current()
     self.scene.event('gl_flush')
-    try:
-      code = compile(self.code.GetValue(), 'Vizardry', 'exec')
-      scope = {'scene': self.scene}
-      exec(code, scope)
-      self.GetParent().update()
-    except:
-      traceback.print_exc()
+    with self.scene.gl_resources.set_current():
+      try:
+        code = compile(self.code.GetValue(), 'Vizardry', 'exec')
+        scope = {'scene': self.scene}
+        exec(code, scope)
+        self.GetParent().update()
+      except:
+        traceback.print_exc()
 
 
 class MainWindow(wx.Frame):
