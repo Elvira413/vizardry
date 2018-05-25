@@ -31,9 +31,6 @@ class InlineNodeData(BaseSceneNodeData):
 
   def init(self, node):
     self.__scope = None
-    self.__gl_init = None
-    self.__gl_render = None
-    self.__gl_cleanup = None
     self.__gl_init_complete = False
     self.__gl_cleanup_deferred = None
     node.parameters.add(Text('code', 'Python Code', multiline=True, syntax='python'))
@@ -42,8 +39,11 @@ class InlineNodeData(BaseSceneNodeData):
   def __update(self, _=None):
     # Save the cleanup step for deferred execution since we're going
     # to replace the callbacks.
-    if self.__gl_cleanup and self.__gl_init_complete:
-      self.__gl_cleanup_deferred = self.__gl_cleanup
+    if self.__scope and self.__scope.get('gl_cleanup') and self.__gl_init_complete:
+      self.__gl_cleanup_deferred = (self.__scope, self.__scope['gl_cleanup'])
+
+    self.__scope = {}
+    self.__gl_init_complete = False
 
     node = self.node
     try:
@@ -51,14 +51,12 @@ class InlineNodeData(BaseSceneNodeData):
       code = compile(code, 'vizardry:' + node.path, 'exec')
       scope = {'node': node}
       exec(code, scope)
-      self.__scope = scope
-      self.__gl_init = scope.get('gl_init')
-      self.__gl_render = scope.get('gl_render')
-      self.__gl_cleanup = scope.get('gl_cleanup')
-      self.__gl_init_complete = False
     except:
       traceback.print_exc()
-    # TODO: Mark this node as requiring re-execution/re-render.
+    else:
+      self.__scope = scope
+
+    node.emit(event.VIEWPORT_UPDATE, None)
 
   def gl_render(self, node):
     if self.__scope is None:
@@ -67,19 +65,19 @@ class InlineNodeData(BaseSceneNodeData):
     # Deferred cleanup if the callbacks have already been replaced.
     if self.__gl_cleanup_deferred:
       try:
-        self.__gl_cleanup_deferred()
+        self.__gl_cleanup_deferred[1]()
       except:
         traceback.print_exc()
       self.__gl_cleanup_deferred = None
 
-    if not self.__gl_init_complete:
-      self.__gl_init()
+    if not self.__gl_init_complete and 'gl_init' in self.__scope:
+      self.__scope['gl_init']()
       self.__gl_init_complete = True
 
-    if self.__gl_render:
-      self.__gl_render()
+    if 'gl_render' in self.__scope:
+      self.__scope['gl_render']()
 
   def gl_cleanup(self, node):
-    if self.__gl_init_complete and self.__gl_cleanup:
-      self.__gl_cleanup()
-      self.__gl_cleanup = None
+    if self.__gl_init_complete and 'gl_cleanup' in self.__scope:
+      self.__scope['gl_cleanup']()
+      del self.__scope['gl_cleanup']

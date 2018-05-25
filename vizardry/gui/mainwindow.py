@@ -19,7 +19,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-from ..scene import Scene
+from ..scene import Scene, event
 from .viewport import Viewport
 import traceback
 import wx, wx.glcanvas
@@ -72,6 +72,7 @@ class MainWindow(wx.Frame):
 
     self.scene = scene or Scene()
     self.scene.gl_context = self.viewport.create_context()
+    self.scene.root.bind(event.VIEWPORT_UPDATE, self.__viewport_update, True)
 
     sizer = wx.BoxSizer(wx.HORIZONTAL)
     sizer.Add(self.viewport, 4, wx.EXPAND)
@@ -79,15 +80,18 @@ class MainWindow(wx.Frame):
     self.SetSizer(sizer)
 
     self.SetClientSize(1024, 512)
-    self.Bind(wx.EVT_CLOSE, self._close)
+    self.Bind(wx.EVT_CLOSE, self.__close)
 
     #self.timer = wx.Timer(self, 1)
     #self.Bind(wx.EVT_TIMER, self._timer, self.timer)
 
-  def _close(self, event):
+  def __viewport_update(self, ev):
+    self.viewport.canvas.Refresh(False)
+
+  def __close(self, ev):
     self.scene.gl_cleanup()
     self.scene.gl_context.destroy_gl_context()
-    event.Skip()
+    ev.Skip()
 
   """
   def _timer(self, event):

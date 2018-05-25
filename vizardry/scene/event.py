@@ -27,6 +27,7 @@ EVENT_DOWN = 'down'
 EVENT_LOCAL = 'local'
 EVENT_VALUE_CHANGED = 'event.value.changed'
 EVENT_PATH_CHANGED = 'event.path.changed'
+EVENT_VIEWPORT_UPDATE = 'event.viewport.update'
 
 
 class Event(nr.types.Named):
