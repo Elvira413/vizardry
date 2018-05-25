@@ -15,7 +15,7 @@ and prototyping algorithms on images, geometry or sound.
 * A single code panel on the right allowing you to set the framerate and
   render into the GL Canvas
 
-![](https://i.imgur.com/eVzQgRK.png)
+![](https://i.imgur.com/lAfJFVR.png)
 
 ## Planned Features
 
