@@ -66,12 +66,6 @@ class ResourceManager:
   def __init__(self):
     self._handles = set()
 
-  def __enter__(self):
-    return self
-
-  def __exit__(self, *args):
-    self.release()
-
   def __getattr__(self, name):
     for subclass in _GLHandle.__subclasses__():
       if subclass.__name__ == name:
@@ -92,14 +86,23 @@ class ResourceManager:
   current = None
 
   @contextlib.contextmanager
-  def set_current(self):
+  def as_current(self, release=True):
     if ResourceManager.current is not None:
       raise RuntimeError('another ResourceManager is current')
     ResourceManager.current = self
     try:
-      yield
+      yield self
     finally:
       ResourceManager.current = None
+      if release:
+        self.release()
+
+  @contextlib.contextmanager
+  def as_autorelease(self):
+    try:
+      yield self
+    finally:
+      self.release()
 
 
 class _GLHandle:
@@ -188,7 +191,7 @@ class Program(_GLHandle):
 
   @classmethod
   def from_fragment(cls, fragment):
-    with ResourceManager() as temp_manager:
+    with ResourceManager().as_autorelease() as temp_manager:
       if isinstance(fragment, str):
         fragment = temp_manager.Shader(GL_FRAGMENT_SHADER, fragment)
 

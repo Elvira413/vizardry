@@ -70,7 +70,7 @@ automatically to the current resource manager.
 ```python
 from vizardry import gl
 
-with gl.ResourceManager():
+with gl.ResourceManager().as_current():
   assert gl.ResourceManager.current is not None
   shader = gl.Shader(gl.GL_VERTEX_SHADER)
   shader.compile(''' my shader code ...''')

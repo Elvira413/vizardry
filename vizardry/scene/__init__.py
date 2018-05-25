@@ -19,11 +19,8 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-import wx
-
-
-class ParameterPaneManager:
-
-  def __init__(self):
-    # TODO
-    self.pane = wx.Panel()
+from .base import *
+from .event import *
+from .parameters import *
+from .scenegraph import *
+from .impl.inlinenode import InlineNodeData
