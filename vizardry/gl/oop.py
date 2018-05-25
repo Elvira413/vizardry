@@ -111,9 +111,10 @@ class _GLHandle:
   _handle = 0
 
   def __new__(cls, *args, **kwargs):
+    if not ResourceManager.current:
+      raise RuntimeError('no active ResourceManager')
     self = object.__new__(cls)
-    if ResourceManager.current:
-      ResourceManager.current.register_handle(self)
+    ResourceManager.current.register_handle(self)
     return self
 
   def __del__(self):
