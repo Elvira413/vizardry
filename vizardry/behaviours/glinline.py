@@ -65,8 +65,6 @@ def gl_init():
   ''')
 
 def gl_render():
-  glClearColor(0.5, 0.5, 0.5, 0.0)
-  glClear(GL_COLOR_BUFFER_BIT)
   glUseProgram(program)
   #glUniform1f(glGetUniformLocation(program, "time"), scene.time)
   glBegin(GL_TRIANGLE_STRIP)

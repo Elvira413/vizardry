@@ -24,6 +24,7 @@ import posixpath
 import re
 import traceback
 import weakref
+from vizardry import gl
 from vizardry.core import event
 from vizardry.core.interfaces import NodeBehaviour, GLObjectInterface
 
@@ -374,19 +375,32 @@ class Scene:
   def gl_cleanup(self):
     for node in self.nodes(GLObjectInterface):
       with node.behaviour.gl_resources.as_current(release=False):
-        node.behaviour.gl_cleanup()
+        try:
+          node.behaviour.gl_cleanup()
+        except:
+          traceback.print_exc()
 
   def gl_render(self):
     for node in self.__removed_gl_nodes:
       with node.behaviour.gl_resources.as_current(release=False):
-        node.behaviour.gl_cleanup()
+        try:
+          node.behaviour.gl_cleanup()
+        except:
+          traceback.print_exc()
     #for node in self.__new_gl_nodes:
     #  node.behaviour.gl_init()
     self.__removed_gl_nodes.clear()
     self.__new_gl_nodes.clear()
+
+    gl.glClearColor(0.0, 0.0, 0.0, 1.0)
+    gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+
     for node in self.nodes(GLObjectInterface):
       with node.behaviour.gl_resources.as_current(release=False):
-        node.behaviour.gl_render()
+        try:
+          node.behaviour.gl_render()
+        except:
+          traceback.print_exc()
 
 
 def node_factory(behaviour_class):
