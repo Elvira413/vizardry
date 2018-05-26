@@ -19,12 +19,11 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-from vizardry.gui.mainwindow import MainWindow
-
 import argparse
 import vizardry
 import sys
 import wx
+from vizardry.main.mainwindow import MainWindow
 
 
 def get_argument_parser(prog):

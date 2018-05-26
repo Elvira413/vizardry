@@ -19,71 +19,41 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-__all__ = ['ChannelRef', 'Output', 'Input', 'SceneNode', 'RootNode', 'Scene']
-
-from .base import *
-from . import event
-from .parameters import ParameterContainer
-from .. import gl
-
-import nr.types
 import os
 import posixpath
 import re
 import traceback
 import weakref
+from vizardry.core import event
+from vizardry.core.interfaces import NodeBehaviour, GLObjectInterface
 
 
-class ChannelRef(nr.types.Named):
+class BaseGLContext:
   """
-  Represents a reference to a node and one of its input or output channels
-  (depending on the context). Can be parsed from a string formatted as
-  `path/to/node:channel`.
-  """
-
-  __annotations__ = [
-    ('path', str),
-    ('channel', str)
-  ]
-
-  @classmethod
-  def parse(cls, s):
-    path, channel = s.partition(':')[::2]
-    if not path or not channel or channel.count(':') != 0:
-      raise ValueError('invalid ChannelRef string', s)
-    return cls(path, channel)
-
-
-class Output(nr.types.Named):
-  """
-  Represents an output channel of a node and the assigned value.
+  Interface for activating/disabling/destroying an OpenGL context.
   """
 
-  __annotations__ = [
-    ('name', str),
-    ('type', object),
-    ('calculated', bool, False),
-    ('value', object, None)
-  ]
+  def __enter__(self):
+    self.enable_gl_context()
+    return self
 
+  def __exit__(self, *a):
+    self.disable_gl_context()
 
-class Input(nr.types.Named):
-  """
-  Represents an input channel of a node and a reference to the output channel
-  that is linked to it. That reference may be #None if the input is not
-  connected.
-  """
+  def enable_gl_context(self):
+    raise NotImplementedError
 
-  __annotations__ = [
-    ('name', str),
-    ('type', object),
-    ('ref', (ChannelRef, None))
-  ]
+  def disable_gl_context(self):
+    raise NotImplementedError
+
+  def destroy_gl_context(self):
+    raise NotImplementedError
 
 
 class SceneNode:
   """
-  Wrapper around a scene node implementation.
+  Represents a node in a tree of nodes. The behaviour of a node is represented
+  by an implementation of the #NodeBehaviour interface.
   """
 
   class _Listener(event.Listener):
@@ -97,28 +67,24 @@ class SceneNode:
         return True
       return False
 
-  def __init__(self, name, data):
-    if data is not None and not isinstance(data, BaseSceneNodeData):
-      raise TypeError('data must be BaseSceneNodeData instance', data)
+  def __init__(self, name, behaviour):
+    if behaviour is not None and not NodeBehaviour.implemented_by(behaviour):
+      raise TypeError('must implemented the NodeBehaviour interface')
     self._parent = None
     self._children = []
     self._listeners = event.EventHandler(SceneNode._Listener)
     self.supports_children = False
     self.auto_invoke_children = True
-    self.data = data
-    self.inputs = []
-    self.outputs = []
-    self.parameters = ParameterContainer()
-    self.gl_resources = gl.ResourceManager()
-    if data:
-      data._node = weakref.ref(self)
-      data.init(self)
-
+    self.behaviour = behaviour
     self.name = name
 
+    if behaviour:
+      behaviour.node = weakref.ref(self)
+      behaviour.node_attached()
+
   def __repr__(self):
-    return '<{} path={!r} name={!r} data={!r}>'.format(
-      type(self).__name__, self.path, self.name, self.data)
+    return '<{} path={!r} name={!r} behaviour={!r}>'.format(
+      type(self).__name__, self.path, self.name, self.behaviour)
 
   @property
   def path(self):
@@ -143,6 +109,13 @@ class SceneNode:
       parent = self.parent
     if isinstance(self, RootNode):
       return self
+    return None
+
+  @property
+  def scene(self):
+    root = self.root
+    if root:
+      return root.scene
     return None
 
   @property
@@ -293,46 +266,15 @@ class SceneNode:
 
     self._listeners.bind(kind, listener, from_anywhere)
 
-  # Forwards to the scene node implementation
+  def implements(self, interface):
+    """
+    A shortcut to check if the behaviour of the node implements a certain
+    behaviour. Returns #False if the node has no behaviour attached.
+    """
 
-  def gl_init(self):
-    if self.data:
-      with self.gl_resources.as_current(release=False):
-        self.data.gl_init(self)
-    if self.supports_children and self.auto_invoke_children:
-      for child in self.children:
-        child.gl_init()
-
-  def gl_cleanup(self):
-    if self.data:
-      with self.gl_resources.as_current(release=False):
-        self.data.gl_cleanup(self)
-    self.gl_resources.release()
-    if self.supports_children and self.auto_invoke_children:
-      for child in self.children:
-        child.gl_cleanup()
-
-  def gl_render(self):
-    if self.data:
-      with self.gl_resources.as_current(release=False):
-        self.data.gl_render(self)
-    if self.supports_children and self.auto_invoke_children:
-      for child in self.children:
-        child.gl_render()
-
-  def execute(self):
-    if self.data:
-      self.data.execute(self)
-    if self.supports_children and self.auto_invoke_children:
-      for child in self.children:
-        child.execute()
-
-  def get_icon(self):
-    return self.data.get_icon(self)
-
-  def build_context_menu(self, menu):
-    if self.data:
-      self.data.build_context_menu(self, menu)
+    if self.behaviour is not None:
+      return interface.implemented_by(self.behaviour)
+    return False
 
 
 class RootNode(SceneNode):
@@ -378,16 +320,16 @@ class Scene:
     self.filename = None
     self.gl_context = None
     self.active_node = None
-    self._new_nodes = set()
-    self._removed_nodes = set()
+    self.__new_gl_nodes = set()
+    self.__removed_gl_nodes = set()
 
     self.root.bind(event.PATH_CHANGED, self.__path_changed, True)
 
     if default:
       import textwrap
-      from .impl.inlinenode import InlineNodeData
-      node = SceneNode('inline', InlineNodeData())
-      node.parameters['code'].set_value(textwrap.dedent("""
+      from vizardry.behaviours.glinline import GLInline
+      node = GLInline()
+      node.behaviour.params['code'] = textwrap.dedent("""
         from vizardry import gl
         from vizardry.gl.native import *
 
@@ -436,7 +378,8 @@ class Scene:
           glVertex2f(-1.0, 1.0)
           glVertex2f(1.0, 1.0)
           glEnd()
-      """))
+      """)
+
       self.root.add(node)
       self.active_node = node
 
@@ -448,29 +391,65 @@ class Scene:
       return 'Untitled'
 
   def __path_changed(self, ev):
-    if ev['old_parent'] != ev.source.parent:
+    if ev.source.implements(GLObjectInterface) and ev['old_parent'] != ev.source.parent:
       # Parent has changed. Has the root changed, too?
       old_root = ev['old_parent'].root if ev['old_parent'] else None
       if old_root != ev.source.root:
         if old_root == self.root:
-          if ev.source in self._new_nodes:
-            self._new_nodes.discard(ev.source)
+          if ev.source in self.__new_gl_nodes:
+            self.__new_gl_nodes.discard(ev.source)
           else:
-            self._removed_nodes.add(ev.source)
+            self.__removed_gl_nodes.add(ev.source)
         elif ev.source.root == self.root:
-          if ev.source in self._removed_nodes:
-            self._removed_nodes.discard(ev.source)
+          if ev.source in self.__removed_gl_nodes:
+            self.__removed_gl_nodes.discard(ev.source)
           else:
-            self._new_nodes.add(ev.source)
+            self.__new_gl_nodes.add(ev.source)
+
+  def nodes(self, interface=None):
+    """
+    Returns a generator that yields all nodes in the scene. If an *interface*
+    is specified, only nodes where the behaviour implements the specified
+    interface are yielded.
+    """
+
+    def generator(node):
+      yield node
+      for child in node.children:
+        yield from generator(child)
+
+    gen = generator(self.root)
+    if interface:
+      gen = filter(lambda x: x.implements(interface), gen)
+    return gen
 
   def gl_cleanup(self):
-    self.root.gl_cleanup()
+    for node in self.nodes(GLObjectInterface):
+      with node.behaviour.gl_resources.as_current(release=False):
+        node.behaviour.gl_cleanup()
 
   def gl_render(self):
-    for node in self._removed_nodes:
-      node.gl_cleanup()
-    for node in self._new_nodes:
-      node.gl_init()
-    self._removed_nodes.clear()
-    self._new_nodes.clear()
-    self.root.gl_render()
+    for node in self.__removed_gl_nodes:
+      with node.behaviour.gl_resources.as_current(release=False):
+        node.behaviour.gl_cleanup()
+    #for node in self.__new_gl_nodes:
+    #  node.behaviour.gl_init()
+    self.__removed_gl_nodes.clear()
+    self.__new_gl_nodes.clear()
+    for node in self.nodes(GLObjectInterface):
+      with node.behaviour.gl_resources.as_current(release=False):
+        node.behaviour.gl_render()
+
+
+def node_factory(behaviour_class):
+  """
+  Create a factory function to create a new #SceneNode with an instance of
+  the specified *behaviour_class*.
+  """
+
+  def factory(name=None):
+    if name is None:
+      name = behaviour_class.__name__.lower()
+    return SceneNode(name, behaviour_class())
+
+  return factory

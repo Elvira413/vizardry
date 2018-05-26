@@ -96,11 +96,6 @@ Vizardry:
 * `ParameterInterface` &ndash; Allows the node to define parameters that can
   be displayed and edited in the Vizardry parameter panel.
 
-* `TimerInterface` &ndash; Allows the node to implement a timer for the GL
-  rendering pipeline and augment a panel at the bottom of the Vizardry layout.
-  Only one node implementing this interface can be active at any time. This
-  is managed by the `TimerInterface` scene descriptor.
-
 * `ComputeInterface` &ndash; Allows to the node declare input and output slots
   for data that can be directed into other nodes. The node will be invoked at
   every frame (as determined by a node implementing the `TimerInterface`).

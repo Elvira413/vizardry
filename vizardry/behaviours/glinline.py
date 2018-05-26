@@ -19,24 +19,28 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-__all__ = ['InlineNodeData']
-
-from .. import event
-from ..base import BaseSceneNodeData
-from ..parameters import Text
+import nr.interface
 import traceback
+from vizardry.core import event
+from vizardry.core.interfaces import ParameterInterface, GLObjectInterface
+from vizardry.core.parameters import Text
+from vizardry.core.scene import node_factory
 
 
-class InlineNodeData(BaseSceneNodeData):
+class GLInlineBehaviour(nr.interface.Implementation):
+  nr.interface.implements(ParameterInterface, GLObjectInterface)
 
-  def init(self, node):
+  def __init__(self):
+    super().__init__()
     self.__scope = None
     self.__gl_init_complete = False
     self.__gl_cleanup_deferred = None
-    node.parameters.add(Text('code', 'Python Code', multiline=True, syntax='python'))
-    node.parameters['code'].bind(event.VALUE_CHANGED, self.__update)
 
-  def __update(self, _=None):
+  def __update(self):
+    """
+    Executes the Python code in the 'code' parameter.
+    """
+
     # Save the cleanup step for deferred execution since we're going
     # to replace the callbacks.
     if self.__scope and self.__scope.get('gl_cleanup') and self.__gl_init_complete:
@@ -45,20 +49,23 @@ class InlineNodeData(BaseSceneNodeData):
     self.__scope = {}
     self.__gl_init_complete = False
 
-    node = self.node
     try:
-      code = node.parameters['code'].get_value()
-      code = compile(code, 'vizardry:' + node.path, 'exec')
-      scope = {'node': node}
+      code = compile(self.params['code'], 'vizardry:' + self.node().path, 'exec')
+      scope = {'node': self.node()}
       exec(code, scope)
     except:
       traceback.print_exc()
     else:
       self.__scope = scope
+      self.node().emit(event.VIEWPORT_UPDATE, None)
 
-    node.emit(event.VIEWPORT_UPDATE, None)
+  @nr.interface.override
+  def node_attached(self):
+    self.params.add(Text('code', 'Python Code', multiline=True, syntax='python'))
+    self.params('code').bind(event.VALUE_CHANGED, lambda ev: self.__update())
 
-  def gl_render(self, node):
+  @nr.interface.override
+  def gl_render(self):
     if self.__scope is None:
       self.__update()
 
@@ -77,7 +84,12 @@ class InlineNodeData(BaseSceneNodeData):
     if 'gl_render' in self.__scope:
       self.__scope['gl_render']()
 
-  def gl_cleanup(self, node):
+  @nr.interface.override
+  def gl_cleanup(self):
     if self.__gl_init_complete and 'gl_cleanup' in self.__scope:
       self.__scope['gl_cleanup']()
       del self.__scope['gl_cleanup']
+    GLObjectInterface.gl_cleanup(self)
+
+
+GLInline = node_factory(GLInlineBehaviour)

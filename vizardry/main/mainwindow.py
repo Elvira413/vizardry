@@ -19,10 +19,12 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-from ..scene import Scene, event
-from .viewport import Viewport
 import traceback
-import wx, wx.glcanvas
+import wx
+from vizardry.core import event
+from vizardry.core.interfaces import ParameterInterface
+from vizardry.core.scene import Scene
+from vizardry.main.viewport import Viewport
 
 
 class EditorPane(wx.Panel):
@@ -50,8 +52,8 @@ class EditorPane(wx.Panel):
     if self.parameter_pane:
       self.parameter_pane.Destroy()
       self.parameter_pane = None
-    if self.scene.active_node:
-      self.parameter_pane = self.scene.active_node.parameters.create_panel(self.edit_page)
+    if self.scene.active_node and self.scene.active_node.implements(ParameterInterface):
+      self.parameter_pane = self.scene.active_node.behaviour.params.create_panel(self.edit_page)
       sizer = wx.BoxSizer(wx.VERTICAL)
       sizer.Add(self.parameter_pane, 1, wx.EXPAND)
       self.edit_page.SetSizer(sizer)

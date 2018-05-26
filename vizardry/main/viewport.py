@@ -19,9 +19,10 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
-from .. import gl, scene
-
-import wx, wx.glcanvas
+from vizardry import gl
+from vizardry.core.scene import BaseGLContext
+import wx
+import wx.glcanvas
 
 
 class Viewport(wx.Panel):
@@ -77,7 +78,7 @@ class Viewport(wx.Panel):
     # TODO: Implement Save as Image ...
 
 
-class ViewportGLContext(scene.BaseGLContext):
+class ViewportGLContext(BaseGLContext):
 
   def __init__(self, canvas, context):
     super().__init__()
