@@ -22,7 +22,7 @@
 import traceback
 import wx
 from vizardry.core import event
-from vizardry.core.interfaces import ParameterInterface
+from vizardry.core.interfaces import NodeBehaviour, ParameterInterface
 from vizardry.core.scene import Scene
 from vizardry.main.viewport import Viewport
 
@@ -84,6 +84,7 @@ class NodelistPanel(wx.Panel):
     self.listbox = wx.ListBox(self, style=wx.LB_SINGLE|wx.LB_SORT)
     self.listbox.Bind(wx.EVT_LISTBOX, lambda ev: self.__listbox_event(ev, False))
     self.listbox.Bind(wx.EVT_LISTBOX_DCLICK, lambda ev: self.__listbox_event(ev, True))
+    self.listbox.Bind(wx.EVT_RIGHT_DOWN, self.__rightclick)
 
     sizer = wx.BoxSizer(wx.VERTICAL)
     sizer.Add(self.listbox, 1, wx.EXPAND)
@@ -92,6 +93,22 @@ class NodelistPanel(wx.Panel):
     self.refresh()
 
     self.scene.root.bind(event.PATH_CHANGED, lambda ev: self.refresh(), from_anywhere=True)
+
+  def __rightclick(self, ev):
+    index = self.listbox.HitTest(ev.GetPosition())
+    if index != wx.NOT_FOUND:
+      node = self.scene.root.find_node(self.listbox.GetString(index))
+      if not node: return
+
+      self.listbox.SetSelection(index)
+      menu = wx.Menu()
+      create_node_menu = wx.Menu()
+      for impl in NodeBehaviour.implementations:
+        create_node_menu.Append(wx.ID_ANY, impl.__name__)
+      menu.Append(wx.ID_ANY, "Create ...", create_node_menu)
+      self.PopupMenu(menu)
+
+      # TODO: Create the node if one is selected by the user.
 
   def __listbox_event(self, ev, double_click):
     index = self.listbox.GetSelection()
