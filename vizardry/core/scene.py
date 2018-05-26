@@ -403,7 +403,7 @@ class Scene:
           traceback.print_exc()
 
 
-def node_factory(behaviour_class):
+def node_factory(behaviour_class, default_name):
   """
   Create a factory function to create a new #SceneNode with an instance of
   the specified *behaviour_class*.
@@ -411,7 +411,7 @@ def node_factory(behaviour_class):
 
   def factory(name=None):
     if name is None:
-      name = behaviour_class.__name__.lower()
+      name = default_name
     return SceneNode(name, behaviour_class())
 
   return factory

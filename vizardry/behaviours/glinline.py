@@ -142,4 +142,4 @@ class GLInlineBehaviour(nr.interface.Implementation):
     GLObjectInterface.gl_cleanup(self)
 
 
-GLInline = node_factory(GLInlineBehaviour)
+GLInline = node_factory(GLInlineBehaviour, 'glinline')

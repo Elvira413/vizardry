@@ -27,6 +27,55 @@ from vizardry.core.scene import Scene
 from vizardry.main.viewport import Viewport
 
 
+class ParameterPanel(wx.Panel):
+
+  def __init__(self, parent, node):
+    super().__init__(parent, -1)
+    self.node = node
+
+    icon = node.behaviour.node_icon()
+    if isinstance(icon, wx.Image):
+      icon = icon.Scale(24, 24).ConvertToBitmap()
+
+    self.path_panel = wx.Panel(self)
+    self.node_icon = wx.StaticBitmap(self.path_panel)
+    if icon:
+      self.node_icon.SetBitmap(icon)
+    self.node_name = wx.TextCtrl(self.path_panel, style=wx.TE_PROCESS_ENTER)
+    self.node_name.SetValue(node.name)
+    self.node_name.Bind(wx.EVT_TEXT_ENTER, self.__on_name_changed)
+    self.node_name.Bind(wx.EVT_KILL_FOCUS, self.__on_name_kill_focus)
+    sizer = wx.BoxSizer(wx.HORIZONTAL)
+    sizer.Add(self.node_icon)
+    sizer.Add(wx.StaticText(self.path_panel, label=(node.parent.path if node.parent else '/')))
+    sizer.Add(self.node_name)
+    self.path_panel.SetSizer(sizer)
+
+    self.node_params = None
+    if node.implements(ParameterInterface):
+      self.node_params = node.behaviour.params.create_panel(self)
+
+    sizer = wx.BoxSizer(wx.VERTICAL)
+    sizer.Add(self.path_panel)
+    if self.node_params:
+      sizer.Add(self.node_params, 1, wx.EXPAND)
+    self.SetSizer(sizer)
+
+  def __on_name_changed(self, ev):
+    try:
+      self.node.name = self.node_name.GetValue()
+    except ValueError as exc:
+      print(exc)
+    else:
+      # The actual name may not be exactly what was entered if there
+      # was a name collision.
+      self.node_name.SetValue(self.node.name)
+
+  def __on_name_kill_focus(self, ev):
+    ev.Skip()
+    self.node_name.SetValue(self.node.name)
+
+
 class EditorPane(wx.Panel):
 
   def __init__(self, parent, scene):
@@ -40,7 +89,7 @@ class EditorPane(wx.Panel):
     self.notebook.AddPage(self.edit_page, 'Edit')
     self.notebook.SetSelection(1)
 
-    self.parameter_pane = None
+    self.parameter_panel = None
 
     sizer = wx.BoxSizer(wx.HORIZONTAL)
     sizer.Add(self.notebook, 1, wx.EXPAND)
@@ -49,13 +98,13 @@ class EditorPane(wx.Panel):
     self.update()
 
   def update(self):
-    if self.parameter_pane:
-      self.parameter_pane.Destroy()
-      self.parameter_pane = None
-    if self.scene.active_node and self.scene.active_node.implements(ParameterInterface):
-      self.parameter_pane = self.scene.active_node.behaviour.params.create_panel(self.edit_page)
+    if self.parameter_panel:
+      self.parameter_panel.Destroy()
+      self.parameter_panel = None
+    if self.scene.active_node:
+      self.parameter_panel = ParameterPanel(self.edit_page, self.scene.active_node)
       sizer = wx.BoxSizer(wx.VERTICAL)
-      sizer.Add(self.parameter_pane, 1, wx.EXPAND)
+      sizer.Add(self.parameter_panel, 1, wx.EXPAND)
       self.edit_page.SetSizer(sizer)
 
 

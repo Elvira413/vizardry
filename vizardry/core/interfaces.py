@@ -24,10 +24,14 @@ This module covers the core interfaces understood by Vizardry.
 """
 
 import nr.interface
+import pkg_resources
 import weakref
+import wx
 from vizardry.core.parameters import Parameters
 from vizardry.core.network import InputList, OutputList
 from vizardry.gl import ResourceManager as GLResourceManager
+
+ICON = None
 
 
 class NodeBehaviour(nr.interface.Interface):
@@ -43,6 +47,13 @@ class NodeBehaviour(nr.interface.Interface):
   @nr.interface.default
   def node_attached(self, node):
     pass
+
+  @nr.interface.default
+  def node_icon(self):
+    global ICON
+    if ICON is None:
+      ICON = wx.Image(pkg_resources.resource_stream('vizardry', 'res/python_file.png'))
+    return ICON
 
 
 class ParameterInterface(NodeBehaviour):
