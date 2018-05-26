@@ -326,60 +326,8 @@ class Scene:
     self.root.bind(event.PATH_CHANGED, self.__path_changed, True)
 
     if default:
-      import textwrap
       from vizardry.behaviours.glinline import GLInline
       node = GLInline()
-      node.behaviour.params['code'] = textwrap.dedent("""
-        from vizardry import gl
-        from vizardry.gl.native import *
-
-        def gl_init():
-          global program
-          program = gl.Program.from_fragment('''
-            #version 330 core
-            uniform float time;
-            in vec2 fragCoord;
-            out vec4 fragColor;
-            const int ncolors = 4;
-            const vec4 colors[ncolors] = vec4[](
-              vec4(0.1, 0.3, 1.0, 1.0),
-              vec4(0.7, 0.9, 1.0, 1.0),
-              vec4(1.0, 1.0, 0.6, 1.0),
-              vec4(0.5, 0.0, 0.5, 1.0)
-            );
-            void main() {
-              vec2 c = fragCoord.xy;
-              c = c * vec2(4,3) - vec2(2.5, 1.5);
-              vec2 z = vec2(0, 0); //cos(time / 100), sin(time / 100));
-              int limit = 16;
-              int i = 0;
-              for (i = 0; i < limit; ++i) {
-                if (z.x * z.x + z.y * z.y >= 4.0) {
-                  break;
-                }
-                z = vec2(z.x*z.x - z.y*z.y, 2.*z.x*z.y) + c;
-              }
-              float x = mod(float(i) / float(limit) + time * 0.25, 1.0) * ncolors;
-              int il = min(int(x), ncolors-2);
-              float w = x - il;
-              fragColor = colors[il] * (1.0-w) + colors[(il+1)] * w;
-            }
-
-          ''')
-
-        def gl_render():
-          glClearColor(0.5, 0.5, 0.5, 0.0)
-          glClear(GL_COLOR_BUFFER_BIT)
-          glUseProgram(program)
-          #glUniform1f(glGetUniformLocation(program, "time"), scene.time)
-          glBegin(GL_TRIANGLE_STRIP)
-          glVertex2f(-1.0, -1.0)
-          glVertex2f(1.0, -1.0)
-          glVertex2f(-1.0, 1.0)
-          glVertex2f(1.0, 1.0)
-          glEnd()
-      """)
-
       self.root.add(node)
       self.active_node = node
 
