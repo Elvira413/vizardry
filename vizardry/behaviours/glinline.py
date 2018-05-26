@@ -37,12 +37,13 @@ def gl_init():
     uniform float time;
     in vec2 fragCoord;
     out vec4 fragColor;
-    const int ncolors = 4;
-    const vec4 colors[ncolors] = vec4[](
-      vec4(0.1, 0.3, 1.0, 1.0),
-      vec4(0.7, 0.9, 1.0, 1.0),
-      vec4(1.0, 1.0, 0.6, 1.0),
-      vec4(0.5, 0.0, 0.5, 1.0)
+    const int ncolors = 5;
+    const vec3 colors[ncolors] = vec3[](
+      vec3(0.1, 0.3, 1.0),
+      vec3(0.1, 0.3, 1.0),
+      vec3(0.7, 0.9, 0.8),
+      vec3(1.0, 1.0, 1.0),
+      vec3(0.7, 0.2, 0.2)
     );
     void main() {
       vec2 c = fragCoord.xy;
@@ -56,10 +57,10 @@ def gl_init():
         }
         z = vec2(z.x*z.x - z.y*z.y, 2.*z.x*z.y) + c;
       }
-      float x = mod(float(i) / float(limit) + time * 0.25, 1.0) * ncolors;
-      int il = min(int(x), ncolors-2);
+      float x = (float(i) / float(limit) + time * 0.25) * (ncolors-1);
+      int il = int(x) % ncolors;
       float w = x - il;
-      fragColor = colors[il] * (1.0-w) + colors[(il+1)] * w;
+      fragColor = vec4(colors[il] * (1.0-w) + colors[(il+1)] * w, 1.0);
     }
 
   ''')
