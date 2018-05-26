@@ -12,10 +12,11 @@ and prototyping algorithms on images, geometry or sound.
 ## Current State
 
 * OpenGL Canvas on the left
-* The single "InlineNode" in the scene is editable in the "Edit" tab and
+* The single "GLInline" in the scene is editable in the "Edit" tab and
   currently has only one parameter: The Python code text field
+* Editing the node name works now, too!
 
-![](https://i.imgur.com/bDHvWNd.png)
+![](https://i.imgur.com/AXz9J2j.png)
 
 ## Planned Features
 
