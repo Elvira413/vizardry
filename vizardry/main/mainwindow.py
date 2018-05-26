@@ -104,8 +104,7 @@ class NodelistPanel(wx.Panel):
 
   def refresh(self):
     self.listbox.Clear()
-    for index, node in enumerate(self.scene.nodes(), -1):
-      if not node.parent: continue
+    for index, node in enumerate(self.scene.nodes()):
       self.listbox.Append(node.path)
       if node == self.scene.active_node:
         self.listbox.SetSelection(index)
