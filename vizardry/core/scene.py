@@ -210,6 +210,9 @@ class SceneNode:
       return None
 
     node = self.root
+    if path == '/':
+      return node
+
     for part in path.split('/')[1:]:
       if not node:
         break
