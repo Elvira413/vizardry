@@ -46,50 +46,16 @@ __Table of Contents__
 > Note: Some parts of this documentation may describe Vizardry in the state
 > that it is supposed to be and not its actual state.
 
+---
+
 ## The Scene Graph
 
 The scene graph consists of a `RootNode` which in turn can contain any number
 of `SceneNode`s. Except for the root node, every scene node is attached to an
-object that we call a "Node Descriptor" which implements several interfaces
-that describe the nodes behaviour.
+object that we call a "Behaviour" which implements at least the `NodeBehaviour`
+interface.
 
-### Interfaces
-
-Every interface acts as a singleton that has access to a scene, allowing it to
-take on a managing role for all nodes of that interface. Interfaces can be
-declared by subclassing the `vizardry.Interface` class. To extend an existing
-interface, use the `vizardry.extends()` function inside the class-body.
-
-Interfaces can then be implemented with the `vizardry.Implementation` class
-and declaring the interfaces it implements with `vizardry.implements()`.
-
-<details><summary><b>Expand: Example of a potential <code>TimerInterface</code></b></summary>
-
-```python
-import vizardry
-from vizardry.params import NodeLink
-class TimerInterface(vizardry.Interface):
-  " Describe the interface with method stubs here. "
-  vizardry.extends(vizardry.NodeBehaviour)
-  def get_refresh_rate(self): 
-    pass
-  def on_refresh(self):
-    pass
-
-  class SceneDescriptor(vizardry.Implementation):
-    " Describe the global behaviour of the interface. "
-    vizardry.implements(vizardry.SceneDescriptor)
-    def declare_parameters(self):
-      self.parameters.add(NodeLink('timer', 'Timer Node', implements=TimerInterface))
-```
-
-Here the `TimerInterface` extends the `vizardry.NodeBehavour` interface
-because it is supposed to be implemented by nodes. The `NodeBehaviour`
-interface requires a declaration of a `SceneDescriptor` implementation.
-
-</details>
-
----
+Vizardry uses the [`nr.interface`][nr.interface] module.
 
 The following node behaviour interfaces are available and recognized by
 Vizardry:
@@ -108,52 +74,18 @@ Vizardry:
   The default `GLInlineNode` implementation allows you to write Python code
   directly in Vizardry that will be executed during the GL rendering pipeline.
 
-* `GLCameraInterface` &ndash; Allows the node to define the GL viewport and
-  receive mouse events while the CTRL key is pressed. Usually this interface
-  need not be implemented by the user as the default implementation
-  `GLCameraNode` covers most use cases (2D/3D Viewport).
-
-
-### Node Descriptors
-
-Node descriptors are simply a combination of one or more implementations of
-`NodeBehaviour` interfaces. They can be created by creating a
-`vizardry.Implementation` subclasses and the respective `vizardry.implements()`
-declarations.
-
-<details><summary><b>Expand: Potential implementation of a node descriptor</b></summary>
-
-```python
-class InlineNodeDescriptor(vizardry.Implementation):
-  vizardry.implements(vizardry.ComputeInterface, vizardry.GLObjectInterface,
-    vizardry.ParameterInterface)
-  def declare_inputs_outputs(self):
-    self.inputs.add(vizardry.Input('input1', object))
-    self.outputs.add(vizardry.Output('output', object))
-  def declare_parameters(self):
-    self.params.add(vizardry.Text('code', 'Python Code', multiline=True
-      syntax='python'))
-    self.params.param('code').bind(vizardry.EVENT_VALUE_CHANGED, self.__update)
-  def gl_render(self):
-    if self.__gl_render:
-      self.__gl_render()
-  def __update(self):
-    code = self.params['code']
-    scope = {'node': self.node}
-    exec(code, scope)
-    self.__gl_render = scope['gl_render']
-    self.emit(vizardry.EVENT_VIEWPORT_UPDATE)
-```
-
-</details>
-
 ---
 
 ## GL Resource Management
 
-The `GLObjectInterface` and `GLCameraInterface` both provide a `gl_resources`
-member that manages OpenGL resources. All objects created with the object
-oriented GL API provided by Vizardry are managed by a resource manager. When
-implementing these interface, you should use the `gl_resources.as_current()`
-context manager to have the GL handles be managed by the correct resource
-manager.
+The `GLObjectInterface` provides a `gl_resources` member that manages OpenGL
+resources. All objects created with the object oriented GL API provided by
+Vizardry are managed by a resource manager. The caller is responsible for
+making the GL resource manager current before invoking the `gl_render()` or
+`gl_cleanup()` methods.
+
+---
+
+  [nr.interface]: https://github.com/NiklasRosenstein-Python/nr.interface
+
+<p align="center">Copyright &copy; 2018 Niklas Rosenstein</p>
