@@ -30,7 +30,21 @@ DEFAULT_CODE = """
 from vizardry import gl
 from vizardry.gl.api import *
 
-def gl_init():
+program = None
+
+def gl_render():
+  if not program:
+    build_program()
+  glUseProgram(program)
+  #glUniform1f(glGetUniformLocation(program, "time"), scene.time)
+  glBegin(GL_TRIANGLE_STRIP)
+  glVertex2f(-1.0, -1.0)
+  glVertex2f(1.0, -1.0)
+  glVertex2f(-1.0, 1.0)
+  glVertex2f(1.0, 1.0)
+  glEnd()
+
+def build_program():
   global program
   program = gl.Program.from_fragment('''
     #version 330 core
@@ -64,16 +78,6 @@ def gl_init():
     }
 
   ''')
-
-def gl_render():
-  glUseProgram(program)
-  #glUniform1f(glGetUniformLocation(program, "time"), scene.time)
-  glBegin(GL_TRIANGLE_STRIP)
-  glVertex2f(-1.0, -1.0)
-  glVertex2f(1.0, -1.0)
-  glVertex2f(-1.0, 1.0)
-  glVertex2f(1.0, 1.0)
-  glEnd()
 """
 
 
@@ -83,21 +87,13 @@ class GLInlineBehaviour(nr.interface.Implementation):
   def __init__(self):
     super().__init__()
     self.__scope = None
-    self.__gl_init_complete = False
-    self.__gl_cleanup_deferred = None
 
   def __update(self):
     """
     Executes the Python code in the 'code' parameter.
     """
 
-    # Save the cleanup step for deferred execution since we're going
-    # to replace the callbacks.
-    if self.__scope and self.__scope.get('gl_cleanup') and self.__gl_init_complete:
-      self.__gl_cleanup_deferred = (self.__scope, self.__scope['gl_cleanup'])
-
     self.__scope = {}
-    self.__gl_init_complete = False
 
     try:
       code = compile(self.params['code'], 'vizardry:' + self.node().path, 'exec')
@@ -120,27 +116,8 @@ class GLInlineBehaviour(nr.interface.Implementation):
     if self.__scope is None:
       self.__update()
 
-    # Deferred cleanup if the callbacks have already been replaced.
-    if self.__gl_cleanup_deferred:
-      try:
-        self.__gl_cleanup_deferred[1]()
-      except:
-        traceback.print_exc()
-      self.__gl_cleanup_deferred = None
-
-    if not self.__gl_init_complete and 'gl_init' in self.__scope:
-      self.__scope['gl_init']()
-      self.__gl_init_complete = True
-
     if 'gl_render' in self.__scope:
       self.__scope['gl_render']()
-
-  @nr.interface.override
-  def gl_cleanup(self):
-    if self.__gl_init_complete and 'gl_cleanup' in self.__scope:
-      self.__scope['gl_cleanup']()
-      del self.__scope['gl_cleanup']
-    GLObjectInterface.gl_cleanup(self)
 
 
 GLInline = node_factory(GLInlineBehaviour, 'glinline')

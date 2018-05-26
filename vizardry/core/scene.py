@@ -387,8 +387,6 @@ class Scene:
           node.behaviour.gl_cleanup()
         except:
           traceback.print_exc()
-    #for node in self.__new_gl_nodes:
-    #  node.behaviour.gl_init()
     self.__removed_gl_nodes.clear()
     self.__new_gl_nodes.clear()
 
