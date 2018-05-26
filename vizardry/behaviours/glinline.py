@@ -28,7 +28,7 @@ from vizardry.core.scene import node_factory
 
 DEFAULT_CODE = """
 from vizardry import gl
-from vizardry.gl.native import *
+from vizardry.gl.api import *
 
 def gl_init():
   global program

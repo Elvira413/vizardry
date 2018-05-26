@@ -25,7 +25,7 @@ Object wrappers for GL resources.
 
 __all__ = ['GLError', 'ResourceManager', 'Program', 'Shader']
 
-from .native import *
+from .api import *
 
 import contextlib
 import warnings

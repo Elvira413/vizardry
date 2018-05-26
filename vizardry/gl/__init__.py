@@ -23,5 +23,5 @@
 A high-level object-oriented interface to OpenGL.
 """
 
-from .native import *
+from .api import *
 from .oop import *
