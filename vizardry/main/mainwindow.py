@@ -76,6 +76,41 @@ class ParameterPanel(wx.Panel):
     self.node_name.SetValue(self.node.name)
 
 
+class NodelistPanel(wx.Panel):
+
+  def __init__(self, parent, scene):
+    super().__init__(parent, -1)
+    self.scene = scene
+    self.listbox = wx.ListBox(self, style=wx.LB_SINGLE|wx.LB_SORT)
+    self.listbox.Bind(wx.EVT_LISTBOX, lambda ev: self.__listbox_event(ev, False))
+    self.listbox.Bind(wx.EVT_LISTBOX_DCLICK, lambda ev: self.__listbox_event(ev, True))
+
+    sizer = wx.BoxSizer(wx.VERTICAL)
+    sizer.Add(self.listbox, 1, wx.EXPAND)
+    self.SetSizer(sizer)
+
+    self.refresh()
+
+    self.scene.root.bind(event.PATH_CHANGED, lambda ev: self.refresh(), from_anywhere=True)
+
+  def __listbox_event(self, ev, double_click):
+    index = self.listbox.GetSelection()
+    if index != wx.NOT_FOUND:
+      node = self.scene.root.find_node(self.listbox.GetString(index))
+    self.scene.active_node = node
+    self.scene.emit(event.SCENE_CHANGED, None)
+    if double_click:
+      self.scene.emit(event.FOCUS_PARAMETERS, None)
+
+  def refresh(self):
+    self.listbox.Clear()
+    for index, node in enumerate(self.scene.nodes(), -1):
+      if not node.parent: continue
+      self.listbox.Append(node.path)
+      if node == self.scene.active_node:
+        self.listbox.SetSelection(index)
+
+
 class EditorPane(wx.Panel):
 
   def __init__(self, parent, scene):
@@ -83,11 +118,12 @@ class EditorPane(wx.Panel):
     self.scene = scene
     self.notebook =  wx.Notebook(self)
 
-    self.scene_page = wx.Panel(self.notebook)
-    self.notebook.AddPage(self.scene_page, 'Scene')
+    self.nodelist_page = NodelistPanel(self.notebook, scene)
+    self.notebook.AddPage(self.nodelist_page, 'Nodes')
     self.edit_page = wx.Panel(self.notebook)
     self.notebook.AddPage(self.edit_page, 'Edit')
     self.notebook.SetSelection(1)
+    self.notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.__page_changed)
 
     self.parameter_panel = None
 
@@ -96,6 +132,12 @@ class EditorPane(wx.Panel):
     self.SetSizer(sizer)
 
     self.update()
+
+    self.scene.bind(event.FOCUS_PARAMETERS, lambda ev: self.notebook.SetSelection(1))
+
+  def __page_changed(self, ev):
+    if self.notebook.GetSelection() == 1:
+      self.update()
 
   def update(self):
     if self.parameter_panel:
@@ -106,6 +148,7 @@ class EditorPane(wx.Panel):
       sizer = wx.BoxSizer(wx.VERTICAL)
       sizer.Add(self.parameter_panel, 1, wx.EXPAND)
       self.edit_page.SetSizer(sizer)
+      self.edit_page.SendSizeEvent()
 
 
 class MainWindow(wx.Frame):

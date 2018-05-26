@@ -321,6 +321,7 @@ class Scene:
     self.filename = None
     self.gl_context = None
     self.active_node = None
+    self.__listeners = event.EventHandler(event.Listener)
     self.__new_gl_nodes = set()
     self.__removed_gl_nodes = set()
 
@@ -354,6 +355,12 @@ class Scene:
             self.__removed_gl_nodes.discard(ev.source)
           else:
             self.__new_gl_nodes.add(ev.source)
+
+  def bind(self, kind, func):
+    self.__listeners.bind(kind, func)
+
+  def emit(self, kind, data):
+    self.__listeners.emit(kind, data, self)
 
   def nodes(self, interface=None):
     """

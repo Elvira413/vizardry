@@ -28,6 +28,8 @@ EVENT_LOCAL = 'local'
 EVENT_VALUE_CHANGED = 'event.value.changed'
 EVENT_PATH_CHANGED = 'event.path.changed'
 EVENT_VIEWPORT_UPDATE = 'event.viewport.update'
+EVENT_SCENE_CHANGED = 'event.scene.changed'
+EVENT_FOCUS_PARAMETERS = 'event.focus.parameters'
 
 
 class Event(nr.types.Named):
