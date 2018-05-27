@@ -13,15 +13,15 @@ and prototyping algorithms on images, geometry or sound.
 
 ## Current State of Vizardry
 
-* OpenGL Canvas on the left
-* The single "GLInline" in the scene is editable in the "Edit" tab and
-  currently has only one parameter: The Python code text field
-* Editing the node name works now, too!
+* No node editor yet :-(
+* But a list of nodes (rightclick on the root to create a new node)
+* Double-click on a node to activate it and jump to the Edit tab
+* Ctrl+Return to commit changes in a text field and triggering an update
 
-![](https://i.imgur.com/AXz9J2j.png)
+![](https://i.imgur.com/XetwLb7.png)
+![](https://i.imgur.com/WeWmx3m.png)
 
-
-__Things to Consider__
+__Things to Consider for the future__
 
 * NumPy <-> OpenGL exchange (eg. [pygarrayimage](http://code.astraw.com/projects/motmot/pygarrayimage.html))
 * Numba (need explicit support, maybe.?)
