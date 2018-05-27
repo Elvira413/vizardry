@@ -23,7 +23,7 @@ import traceback
 import wx
 from vizardry.core import event
 from vizardry.core.interfaces import NodeBehaviour, ParameterInterface
-from vizardry.core.scene import Scene
+from vizardry.core.scene import Scene, get_node_factories
 from vizardry.main.viewport import Viewport
 
 
@@ -102,20 +102,30 @@ class NodelistPanel(wx.Panel):
 
       self.listbox.SetSelection(index)
       menu = wx.Menu()
-      create_node_menu = wx.Menu()
-      for impl in NodeBehaviour.implementations:
-        create_node_menu.Append(wx.ID_ANY, impl.__name__)
-      menu.Append(wx.ID_ANY, "Create ...", create_node_menu)
-      self.PopupMenu(menu)
 
-      # TODO: Create the node if one is selected by the user.
+      if node.supports_children:
+        create_node_map = {}
+        create_node_menu = wx.Menu()
+        i = 0
+        for factory in get_node_factories():
+          create_node_map[i] = factory
+          create_node_menu.Append(i, factory.name)
+          i += 1
+        menu.Append(wx.ID_ANY, "Create ...", create_node_menu)
+
+      i = self.GetPopupMenuSelectionFromUser(menu)
+
+      if node.supports_children and i in create_node_map:
+        new_node = create_node_map[i]()
+        node.add(new_node)
+        self.scene.set_active_node(new_node)
+        self.refresh()
 
   def __listbox_event(self, ev, double_click):
     index = self.listbox.GetSelection()
     if index != wx.NOT_FOUND:
       node = self.scene.root.find_node(self.listbox.GetString(index))
-    self.scene.active_node = node
-    self.scene.emit(event.SCENE_CHANGED, None)
+    self.scene.set_active_node(node)
     if double_click:
       self.scene.emit(event.FOCUS_PARAMETERS, None)
 

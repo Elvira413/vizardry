@@ -382,6 +382,14 @@ class Scene:
       gen = filter(lambda x: x.implements(interface), gen)
     return gen
 
+  def set_active_node(self, node):
+    if not isinstance(node, SceneNode):
+      raise TypeError('expected SceneNode')
+    if node.root != self.root:
+      raise RuntimeError('node is not in the same root')
+    self.active_node = node
+    self.emit(event.SCENE_CHANGED, None)
+
   def gl_cleanup(self):
     for node in self.nodes(GLObjectInterface):
       with node.behaviour.gl_resources.as_current(release=False):
@@ -411,15 +419,22 @@ class Scene:
           traceback.print_exc()
 
 
-def node_factory(behaviour_class, default_name):
+class node_factory:
   """
-  Create a factory function to create a new #SceneNode with an instance of
+  Create a factory which creates a new #SceneNode with an instance of
   the specified *behaviour_class*.
   """
 
-  def factory(name=None):
-    if name is None:
-      name = default_name
-    return SceneNode(name, behaviour_class())
+  factories = []
 
-  return factory
+  def __init__(self, behaviour_class, name):
+    self.behaviour_class = behaviour_class
+    self.name = name
+    node_factory.factories.append(self)
+
+  def __call__(self, name=None):
+    return SceneNode(name or self.name, self.behaviour_class())
+
+
+def get_node_factories():
+  return node_factory.factories
