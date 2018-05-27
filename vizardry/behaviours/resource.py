@@ -20,58 +20,17 @@
 # IN THE SOFTWARE.
 
 import nr.interface
-import traceback
 from vizardry.core import event
-from vizardry.core.interfaces import ParameterInterface, GLObjectInterface
+from vizardry.core.interfaces import ParameterInterface
 from vizardry.core.parameters import Text
 from vizardry.core.scene import node_factory
 
-DEFAULT_CODE ='''
-from vizardry import gl
-from vizardry.gl.api import *
 
-def gl_render():
-  pass
-'''.lstrip()
+class ResourceBehaviour(nr.interface.Implementation):
+  nr.interface.implements(ParameterInterface)
 
-
-class GLInlineBehaviour(nr.interface.Implementation):
-  nr.interface.implements(ParameterInterface, GLObjectInterface)
-
-  def __init__(self):
-    super().__init__()
-    self.__scope = None
-
-  def __update(self):
-    """
-    Executes the Python code in the 'code' parameter.
-    """
-
-    self.__scope = {}
-
-    try:
-      code = compile(self.params['code'], 'vizardry:' + self.node().path, 'exec')
-      scope = {'node': self.node()}
-      exec(code, scope)
-    except:
-      traceback.print_exc()
-    else:
-      self.__scope = scope
-      self.node().emit(event.VIEWPORT_UPDATE, None)
-
-  @nr.interface.override
   def node_attached(self):
-    self.params.add(Text('code', 'Python Code', multiline=True, syntax='python'))
-    self.params('code').bind(event.VALUE_CHANGED, lambda ev: self.__update())
-    self.params['code'] = DEFAULT_CODE
-
-  @nr.interface.override
-  def gl_render(self):
-    if self.__scope is None:
-      self.__update()
-
-    if 'gl_render' in self.__scope:
-      self.__scope['gl_render']()
+    self.params.add(Text('text', 'Text', multiline=True, syntax='plain'))
 
 
-GLInline = node_factory(GLInlineBehaviour, 'glinline')
+Resource = node_factory(ResourceBehaviour, 'resource')

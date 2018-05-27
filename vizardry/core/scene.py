@@ -319,7 +319,7 @@ class RootNode(SceneNode):
 
 class Scene:
 
-  def __init__(self, default=True):
+  def __init__(self):
     self.root = RootNode(self)
     self.filename = None
     self.gl_context = None
@@ -329,12 +329,6 @@ class Scene:
     self.__removed_gl_nodes = set()
 
     self.root.bind(event.PATH_CHANGED, self.__path_changed, True)
-
-    if default:
-      from vizardry.behaviours.glinline import GLInline
-      node = GLInline()
-      self.root.add(node)
-      self.active_node = node
 
   @property
   def name(self):

@@ -19,6 +19,7 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
+import textwrap
 import traceback
 import wx
 from vizardry.core import event
@@ -148,7 +149,7 @@ class EditorPane(wx.Panel):
     self.notebook.AddPage(self.nodelist_page, 'Nodes')
     self.edit_page = wx.Panel(self.notebook)
     self.notebook.AddPage(self.edit_page, 'Edit')
-    self.notebook.SetSelection(1)
+    self.notebook.SetSelection(1 if self.scene.active_node else 0)
     self.notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.__page_changed)
 
     self.parameter_panel = None
@@ -186,6 +187,7 @@ class MainWindow(wx.Frame):
     super().__init__(None, -1, "Vizardry")
     if scene is None:
       scene = Scene()
+      add_default_nodes(scene)
 
     self.viewport = Viewport(self, scene)
     self.settings_pane = EditorPane(self, scene)
@@ -229,3 +231,64 @@ class MainWindow(wx.Frame):
   def update(self):
     self._update_timer()
     self.viewport.canvas.Refresh(False)
+
+
+def add_default_nodes(scene):
+  from vizardry.behaviours.glinline import GLInline
+  from vizardry.behaviours.resource import Resource
+
+  glinline = GLInline()
+  glinline.behaviour.params['code'] = textwrap.dedent('''
+    from vizardry import gl
+    from vizardry.gl.api import *
+
+    program = None
+
+    def gl_render():
+      global program
+      if not program:
+        code = node.find_node('../fragment').behaviour.params['text']
+        program = gl.Program.from_fragment(code)
+      glUseProgram(program)
+      glBegin(GL_TRIANGLE_STRIP)
+      glVertex2f(-1.0, -1.0)
+      glVertex2f(1.0, -1.0)
+      glVertex2f(-1.0, 1.0)
+      glVertex2f(1.0, 1.0)
+      glEnd()
+    ''').lstrip()
+  scene.root.add(glinline)
+
+  fragment = Resource('fragment')
+  fragment.behaviour.params['text'] = textwrap.dedent('''
+    #version 330 core
+    uniform float time;
+    in vec2 fragCoord;
+    out vec4 fragColor;
+    const int ncolors = 5;
+    const vec3 colors[ncolors] = vec3[](
+      vec3(0.1, 0.3, 1.0),
+      vec3(0.1, 0.3, 1.0),
+      vec3(0.7, 0.9, 0.8),
+      vec3(1.0, 1.0, 1.0),
+      vec3(0.7, 0.2, 0.2)
+    );
+    void main() {
+      vec2 c = fragCoord.xy;
+      c = c * vec2(4,3) - vec2(2.5, 1.5);
+      vec2 z = vec2(0, 0); //cos(time / 100), sin(time / 100));
+      int limit = 16;
+      int i = 0;
+      for (i = 0; i < limit; ++i) {
+        if (z.x * z.x + z.y * z.y >= 4.0) {
+          break;
+        }
+        z = vec2(z.x*z.x - z.y*z.y, 2.*z.x*z.y) + c;
+      }
+      float x = (float(i) / float(limit) + time * 0.25) * (ncolors-1);
+      int il = int(x) % ncolors;
+      float w = x - il;
+      fragColor = vec4(colors[il] * (1.0-w) + colors[(il+1)] * w, 1.0);
+    }
+    ''').lstrip()
+  scene.root.add(fragment)
