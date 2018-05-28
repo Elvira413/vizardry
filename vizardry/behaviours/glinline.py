@@ -37,16 +37,20 @@ def gl_render():
 class GLInlineBehaviour(nr.interface.Implementation):
   nr.interface.implements(GLObjectInterface)
 
-  def __init__(self):
+  def __init__(self, gl_render=None):
     super().__init__()
     self.__scope = None
+    self.__gl_render = gl_render
 
   def __update(self):
     """
     Executes the Python code in the 'code' parameter.
     """
 
-    node = self.node()
+    if self.__gl_render:
+      return
+
+    node = self.node
     self.__scope = {}
 
     try:
@@ -61,17 +65,20 @@ class GLInlineBehaviour(nr.interface.Implementation):
 
   @nr.interface.override
   def node_attached(self, node):
-    node.params.add(Text('code', 'Python Code', multiline=True, syntax='python'))
-    node.params('code').bind(Text.EV_VALUE_CHANGED, lambda ev: self.__update())
-    node.params['code'] = DEFAULT_CODE
+    if not self.__gl_render:
+      node.params.add(Text('code', 'Python Code', multiline=True, syntax='python'))
+      node.params('code').bind(Text.EV_VALUE_CHANGED, lambda ev: self.__update())
+      node.params['code'] = DEFAULT_CODE
 
   @nr.interface.override
   def gl_render(self):
-    if self.__scope is None:
-      self.__update()
-
-    if 'gl_render' in self.__scope:
-      self.__scope['gl_render']()
+    if self.__gl_render:
+      self.__gl_render(self.node)
+    else:
+      if self.__scope is None:
+        self.__update()
+      if 'gl_render' in self.__scope:
+        self.__scope['gl_render']()
 
 
 GLInline = node_factory(GLInlineBehaviour, 'glinline')
