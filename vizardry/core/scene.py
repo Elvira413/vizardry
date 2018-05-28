@@ -23,6 +23,7 @@ import nr.types
 import os
 import posixpath
 import re
+import time
 import traceback
 import weakref
 from vizardry import gl
@@ -124,6 +125,16 @@ class Scene(Network):
   """
   A scene is a container for a node network and manages certain aspects of the
   execution pipeline.
+
+  # Members
+  time (float): This member represents the scene time. This can be set before
+    a scene is executed to influence nodes that depend on time. You may also
+    wish to set the #delta_time and #frame members in that case. You may want
+    to use the #SceneTimer convenience class which sets these members
+    automatically.
+  delta_time (float): The time passed since the last execution. The default
+    value is 0.0.
+  frame (int): The frame number. Defaults to 0.
   """
 
   EV_VIEWPORT_UPDATE = 'Scene.EV_VIEWPORT_UPDATE'
@@ -137,6 +148,9 @@ class Scene(Network):
     super().__init__(lambda s: SceneNode(s, 'root', self.RootBehaviour()))
     self.__active_node = None
     self.__listeners = EventHandler()
+    self.time = 0.0
+    self.delta_time = 0.0
+    self.frame = 0
 
   @property
   def active_node(self):
@@ -318,6 +332,43 @@ class SceneNode(NetworkNode):
     if old_parent != parent:
       data = {'new_parent': parent, 'old_parent': old_parent}
       self.emit(self.EV_PARENT_CHANGED, data)
+
+
+class SceneTimer:
+  """
+  A helper class to set the #Scene.timer, #Scene.delta_time and #Scene.frame
+  members for real-time applications. By default, it uses a limiting frame
+  rate of 50. Passing #None for the *fps* parameter unlocks the frame rate
+  limit.
+  """
+
+  def __init__(self, scene, fps=50):
+    self.scene = scene
+    self.fps = fps
+    self.frame = 0
+    self.start_time = None
+    self.last_time = None
+
+  def begin_frame(self):
+    current = time.clock()
+    if self.start_time is None:
+      self.start_time = current
+
+    self.scene.time = current - self.start_time
+    self.scene.frame = self.frame
+    if self.last_time is None:
+      self.scene.delta_time = 0.0
+    else:
+      self.scene.delta_time = current - self.last_time
+      if self.fps is not None:
+        # Limit the refresh rate.
+        expected = 1.0 / self.fps
+        if self.scene.delta_time < expected:
+          time.sleep(expected)
+          self.scene.delta_time = expected
+
+    self.frame += 1
+    self.last_time = current
 
 
 class node_factory:
