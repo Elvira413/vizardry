@@ -193,7 +193,7 @@ class MainWindow(wx.Frame):
 
     self.scene = scene or Scene()
     self.scene.gl_context = self.viewport.create_context()
-    self.scene.root.bind(self.scene.EV_VIEWPORT_UPDATE, self.__viewport_update, True)
+    self.scene.bind(self.scene.EV_VIEWPORT_UPDATE, self.__viewport_update)
 
     sizer = wx.BoxSizer(wx.HORIZONTAL)
     sizer.Add(self.viewport, 4, wx.EXPAND)
