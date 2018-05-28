@@ -192,7 +192,6 @@ class MainWindow(wx.Frame):
     self.settings_pane = EditorPane(self, scene)
 
     self.scene = scene or Scene()
-    self.scene.gl_context = self.viewport.create_context()
     self.scene.bind(self.scene.EV_VIEWPORT_UPDATE, self.__viewport_update)
 
     sizer = wx.BoxSizer(wx.HORIZONTAL)
@@ -211,7 +210,6 @@ class MainWindow(wx.Frame):
 
   def __close(self, ev):
     self.scene.gl_cleanup()
-    self.scene.gl_context.destroy_gl_context()
     ev.Skip()
 
   """

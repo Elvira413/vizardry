@@ -37,10 +37,18 @@ class NodeBehaviour(nr.interface.Interface):
   This is the parent of all interfaces that operate with nodes.
   """
 
-  node = nr.interface.attr(weakref.ref)
-
   def __init__(self):
-    self.node = lambda: None
+    self.__node = lambda: None
+
+  @property
+  @nr.interface.final
+  def node(self):
+    return self.__node()
+
+  @node.setter
+  @nr.interface.final
+  def node(self, node):
+    self.__node = weakref.ref(node)
 
   @nr.interface.default
   def node_attached(self, node):

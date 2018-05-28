@@ -20,7 +20,7 @@
 # IN THE SOFTWARE.
 
 from vizardry import gl
-from vizardry.core.scene import BaseGLContext
+import contextlib
 import wx
 import wx.glcanvas
 
@@ -46,23 +46,24 @@ class Viewport(wx.Panel):
     sizer.Add(self.canvas, 1, wx.EXPAND)
     self.SetSizer(sizer)
 
-
-  def create_context(self):
-    return ViewportGLContext(self.canvas, self.context)
+  @contextlib.contextmanager
+  def as_current(self):
+    self.canvas.SetCurrent(self.context)
+    yield
 
   def __erase_background(self, ev):
     pass  # Do nothing, to avoid flashing on Windows
 
   def __size_event(self, ev):
     self.Show()
-    with self.scene.gl_context:
+    with self.as_current():
       size = self.canvas.GetClientSize()
       gl.glViewport(0, 0, size.width, size.height)
       self.canvas.Refresh(False)
       ev.Skip()
 
   def __paint_event(self, ev):
-    with self.scene.gl_context:
+    with self.as_current():
       self.scene.gl_render()
       self.canvas.SwapBuffers()
       ev.Skip()
@@ -76,20 +77,3 @@ class Viewport(wx.Panel):
     menu.Append(1, '&Save as Image ...')
     sel = self.GetPopupMenuSelectionFromUser(menu)
     # TODO: Implement Save as Image ...
-
-
-class ViewportGLContext(BaseGLContext):
-
-  def __init__(self, canvas, context):
-    super().__init__()
-    self._canvas = canvas
-    self._context = context
-
-  def enable_gl_context(self):
-    self._canvas.SetCurrent(self._context)
-
-  def disable_gl_context(self):
-    pass
-
-  def destroy_gl_context(self):
-    pass

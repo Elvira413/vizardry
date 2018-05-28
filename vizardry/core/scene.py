@@ -32,28 +32,6 @@ from vizardry.core.interfaces import NodeBehaviour, GLObjectInterface
 from vizardry.core.parameters import Parameters
 
 
-class BaseGLContext:
-  """
-  Interface for activating/disabling/destroying an OpenGL context.
-  """
-
-  def __enter__(self):
-    self.enable_gl_context()
-    return self
-
-  def __exit__(self, *a):
-    self.disable_gl_context()
-
-  def enable_gl_context(self):
-    raise NotImplementedError
-
-  def disable_gl_context(self):
-    raise NotImplementedError
-
-  def destroy_gl_context(self):
-    raise NotImplementedError
-
-
 class ChannelRef(nr.types.Named):
   """
   Represents a reference to a node and one of its input or output channels
@@ -253,7 +231,7 @@ class SceneNode(NetworkNode):
     self.inputs = InputList()
     self.outputs = OutputList()
     self.behaviour = behaviour
-    behaviour.node = weakref.ref(self)
+    behaviour.node = self
     super().__init__(network, name)
     behaviour.node_attached(self)
 
@@ -355,8 +333,8 @@ class node_factory:
     self.name = name
     node_factory.factories.append(self)
 
-  def __call__(self, scene, name=None):
-    return SceneNode(scene, name or self.name, self.behaviour_class())
+  def __call__(self, scene, name=None, *args, **kwargs):
+    return SceneNode(scene, name or self.name, self.behaviour_class(*args, **kwargs))
 
 
 def get_node_factories():
