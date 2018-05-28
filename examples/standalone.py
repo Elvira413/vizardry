@@ -28,7 +28,7 @@ import nr.interface
 import pygame
 import sys
 from vizardry.core.interfaces import GLObjectInterface
-from vizardry.core.scene import Scene, node_factory
+from vizardry.core.scene import Scene, SceneTimer, node_factory
 from vizardry.gl import *
 
 
@@ -55,7 +55,7 @@ class MandelbrotBehaviour(nr.interface.Implementation):
         void main() {
           vec2 c = fragCoord.xy;
           c = c * vec2(4,3) - vec2(2.5, 1.5);
-          vec2 z = vec2(0, 0); //cos(time / 100), sin(time / 100));
+          vec2 z = vec2(cos(time / 10), sin(time / 10));
           int limit = 16;
           int i = 0;
           for (i = 0; i < limit; ++i) {
@@ -64,7 +64,7 @@ class MandelbrotBehaviour(nr.interface.Implementation):
             }
             z = vec2(z.x*z.x - z.y*z.y, 2.*z.x*z.y) + c;
           }
-          float x = (float(i) / float(limit) + time * 0.25) * (ncolors-1);
+          float x = float(i) / float(limit) * (ncolors-1);
           int il = int(x) % ncolors;
           float w = x - il;
           fragColor = vec4(colors[il] * (1.0-w) + colors[(il+1)] * w, 1.0);
@@ -72,6 +72,7 @@ class MandelbrotBehaviour(nr.interface.Implementation):
         ''')
 
     glUseProgram(self.program)
+    glUniform1f(glGetUniformLocation(self.program, 'time'), self.node.scene.time)
     glBegin(GL_TRIANGLE_STRIP)
     glVertex2f(-1.0, -1.0)
     glVertex2f(1.0, -1.0)
@@ -89,11 +90,13 @@ def main():
   pygame.display.set_caption('Vizardry Standalone')
 
   scene = Scene()
+  timer = SceneTimer(scene)
   node = Mandelbrot(scene)
   node.attach_to(scene.root)
 
   running = True
   while running:
+    timer.begin_frame()
     scene.gl_render()
     pygame.display.flip()
 

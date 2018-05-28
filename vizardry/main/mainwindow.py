@@ -247,6 +247,7 @@ def add_default_nodes(scene):
         code = node.find_node('../fragment').params['text']
         program = gl.Program.from_fragment(code)
       glUseProgram(program)
+      glUniform1f(glGetUniformLocation(program, 'time'), node.scene.time)
       glBegin(GL_TRIANGLE_STRIP)
       glVertex2f(-1.0, -1.0)
       glVertex2f(1.0, -1.0)
@@ -273,7 +274,7 @@ def add_default_nodes(scene):
     void main() {
       vec2 c = fragCoord.xy;
       c = c * vec2(4,3) - vec2(2.5, 1.5);
-      vec2 z = vec2(0, 0); //cos(time / 100), sin(time / 100));
+      vec2 z = vec2(cos(time / 10), sin(time / 10));
       int limit = 16;
       int i = 0;
       for (i = 0; i < limit; ++i) {
@@ -282,7 +283,7 @@ def add_default_nodes(scene):
         }
         z = vec2(z.x*z.x - z.y*z.y, 2.*z.x*z.y) + c;
       }
-      float x = (float(i) / float(limit) + time * 0.25) * (ncolors-1);
+      float x = float(i) / float(limit) * (ncolors-1);
       int il = int(x) % ncolors;
       float w = x - il;
       fragColor = vec4(colors[il] * (1.0-w) + colors[(il+1)] * w, 1.0);
