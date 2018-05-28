@@ -22,8 +22,7 @@
 import textwrap
 import traceback
 import wx
-from vizardry.core import event
-from vizardry.core.interfaces import NodeBehaviour, ParameterInterface
+from vizardry.core.interfaces import NodeBehaviour
 from vizardry.core.scene import Scene, get_node_factories
 from vizardry.main.viewport import Viewport
 
@@ -52,9 +51,7 @@ class ParameterPanel(wx.Panel):
     sizer.Add(self.node_name)
     self.path_panel.SetSizer(sizer)
 
-    self.node_params = None
-    if node.implements(ParameterInterface):
-      self.node_params = node.behaviour.params.create_panel(self)
+    self.node_params = node.params.create_panel(self)
 
     sizer = wx.BoxSizer(wx.VERTICAL)
     sizer.Add(self.path_panel)
@@ -93,7 +90,9 @@ class NodelistPanel(wx.Panel):
 
     self.refresh()
 
-    self.scene.root.bind(event.PATH_CHANGED, lambda ev: self.refresh(), from_anywhere=True)
+    func = lambda ev: self.refresh()
+    self.scene.root.bind(self.scene.root.EV_NAME_CHANGED, func, global_=True)
+    self.scene.root.bind(self.scene.root.EV_PARENT_CHANGED, func, global_=True)
 
   def __rightclick(self, ev):
     index = self.listbox.HitTest(ev.GetPosition())
@@ -119,20 +118,20 @@ class NodelistPanel(wx.Panel):
       if node.supports_children and i in create_node_map:
         new_node = create_node_map[i]()
         node.add(new_node)
-        self.scene.set_active_node(new_node)
+        self.scene.active_node = new_node
         self.refresh()
 
   def __listbox_event(self, ev, double_click):
     index = self.listbox.GetSelection()
     if index != wx.NOT_FOUND:
       node = self.scene.root.find_node(self.listbox.GetString(index))
-    self.scene.set_active_node(node)
+    self.scene.active_node = node
     if double_click:
-      self.scene.emit(event.FOCUS_PARAMETERS, None)
+      self.scene.emit(self.scene.EV_FOCUS_PARAMETERS)
 
   def refresh(self):
     self.listbox.Clear()
-    for index, node in enumerate(self.scene.nodes()):
+    for index, node in enumerate(self.scene.root.iter_hierarchy()):
       self.listbox.Append(node.path)
       if node == self.scene.active_node:
         self.listbox.SetSelection(index)
@@ -160,7 +159,7 @@ class EditorPane(wx.Panel):
 
     self.update()
 
-    self.scene.bind(event.FOCUS_PARAMETERS, lambda ev: self.notebook.SetSelection(1))
+    self.scene.bind(self.scene.EV_FOCUS_PARAMETERS, lambda ev: self.notebook.SetSelection(1))
 
   def __page_changed(self, ev):
     if self.notebook.GetSelection() == 1:
@@ -194,7 +193,7 @@ class MainWindow(wx.Frame):
 
     self.scene = scene or Scene()
     self.scene.gl_context = self.viewport.create_context()
-    self.scene.root.bind(event.VIEWPORT_UPDATE, self.__viewport_update, True)
+    self.scene.root.bind(self.scene.EV_VIEWPORT_UPDATE, self.__viewport_update, True)
 
     sizer = wx.BoxSizer(wx.HORIZONTAL)
     sizer.Add(self.viewport, 4, wx.EXPAND)
@@ -237,8 +236,8 @@ def add_default_nodes(scene):
   from vizardry.behaviours.glinline import GLInline
   from vizardry.behaviours.resource import Resource
 
-  glinline = GLInline()
-  glinline.behaviour.params['code'] = textwrap.dedent('''
+  glinline = GLInline(scene)
+  glinline.params['code'] = textwrap.dedent('''
     from vizardry import gl
     from vizardry.gl.api import *
 
@@ -247,7 +246,7 @@ def add_default_nodes(scene):
     def gl_render():
       global program
       if not program:
-        code = node.find_node('../fragment').behaviour.params['text']
+        code = node.find_node('../fragment').params['text']
         program = gl.Program.from_fragment(code)
       glUseProgram(program)
       glBegin(GL_TRIANGLE_STRIP)
@@ -257,10 +256,10 @@ def add_default_nodes(scene):
       glVertex2f(1.0, 1.0)
       glEnd()
     ''').lstrip()
-  scene.root.add(glinline)
+  glinline.attach_to(scene.root)
 
-  fragment = Resource('fragment')
-  fragment.behaviour.params['text'] = textwrap.dedent('''
+  fragment = Resource(scene, 'fragment')
+  fragment.params['text'] = textwrap.dedent('''
     #version 330 core
     uniform float time;
     in vec2 fragCoord;
@@ -291,4 +290,4 @@ def add_default_nodes(scene):
       fragColor = vec4(colors[il] * (1.0-w) + colors[(il+1)] * w, 1.0);
     }
     ''').lstrip()
-  scene.root.add(fragment)
+  fragment.attach_to(scene.root)

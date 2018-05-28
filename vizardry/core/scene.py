@@ -19,14 +19,17 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 
+import nr.types
 import os
 import posixpath
 import re
 import traceback
 import weakref
 from vizardry import gl
-from vizardry.core import event
+from vizardry.core.generics.eventhandler import EventHandler
+from vizardry.core.generics.network import *
 from vizardry.core.interfaces import NodeBehaviour, GLObjectInterface
+from vizardry.core.parameters import Parameters
 
 
 class BaseGLContext:
@@ -51,224 +54,258 @@ class BaseGLContext:
     raise NotImplementedError
 
 
-class SceneNode:
+class ChannelRef(nr.types.Named):
   """
-  Represents a node in a tree of nodes. The behaviour of a node is represented
-  by an implementation of the #NodeBehaviour interface.
+  Represents a reference to a node and one of its input or output channels
+  (depending on the context). Can be parsed from a string formatted as
+  `path/to/node:channel`.
   """
 
-  class _Listener(event.Listener):
-    __annotations__ = [
-      ('func', callable),
-      ('from_anywhere', bool, False)
-    ]
+  __annotations__ = [
+    ('path', str),
+    ('channel', str)
+  ]
 
-    def check(self, event, **kwargs):
-      if self.from_anywhere or kwargs.get('current') == event.source:
-        return True
-      return False
+  @classmethod
+  def parse(cls, s):
+    path, channel = s.partition(':')[::2]
+    if not path or not channel or channel.count(':') != 0:
+      raise ValueError('invalid ChannelRef string', s)
+    return cls(path, channel)
 
-  def __init__(self, name, behaviour):
-    if behaviour is not None and not NodeBehaviour.implemented_by(behaviour):
-      raise TypeError('must implemented the NodeBehaviour interface')
-    self._parent = None
-    self._children = []
-    self._listeners = event.EventHandler(SceneNode._Listener)
-    self.supports_children = False
-    self.auto_invoke_children = True
-    self.behaviour = behaviour
-    self.name = name
 
-    if behaviour:
-      behaviour.node = weakref.ref(self)
-      behaviour.node_attached()
+class Output(nr.types.Named):
+  """
+  Represents an output channel of a node and the assigned value.
+  """
+
+  __annotations__ = [
+    ('name', str),
+    ('type', object),
+    ('calculated', bool, False),
+    ('value', object, None)
+  ]
+
+
+class Input(nr.types.Named):
+  """
+  Represents an input channel of a node and a reference to the output channel
+  that is linked to it. That reference may be #None if the input is not
+  connected.
+  """
+
+  __annotations__ = [
+    ('name', str),
+    ('type', object),
+    ('ref', (ChannelRef, None))
+  ]
+
+
+class _BaseList:
+
+  def __init__(self):
+    self._items = []
+
+  def __iter__(self):
+    return iter(self._items)
+
+  def __len__(self):
+    return len(self._items)
+
+  def __getitem__(self, index):
+    return self._items[index]
 
   def __repr__(self):
-    return '<{} path={!r} name={!r} behaviour={!r}>'.format(
-      type(self).__name__, self.path, self.name, self.behaviour)
+    return '{}({})'.format(type(self).__name__, self._outputs)
+
+  def clear(self):
+    self._items.clear()
+
+
+class OutputList(_BaseList):
+
+  def add(self, *a, **kw):
+    output = Output(*a, **kw)
+    for other in self._outputs:
+      if other.name == output.name:
+        raise ValueError('output already exists: {!r}'.format(output.name))
+    self._outputs.append(output)
+
+
+class InputList(_BaseList):
+
+  def add(self, *a, **kw):
+    input = Input(*a, **kw)
+    for input in self._items:
+      if other.name == input.name:
+        raise ValueError('input already exists: {!r}'.format(input.name))
+    self._items.append(input)
+
+
+class Scene(Network):
+  """
+  A scene is a container for a node network and manages certain aspects of the
+  execution pipeline.
+  """
+
+  EV_VIEWPORT_UPDATE = 'Scene.EV_VIEWPORT_UPDATE'
+  EV_FOCUS_PARAMETERS = 'Scene.EV_FOCUS_PARAMETERS'
+  EV_ACTIVE_NODE_CHANGED = 'Scene.EV_ACTIVE_NODE_CHANGED'
+
+  class RootBehaviour(nr.interface.Implementation):
+    nr.interface.implements(NodeBehaviour)
+
+  def __init__(self):
+    super().__init__(lambda s: SceneNode(s, 'root', self.RootBehaviour()))
+    self.__active_node = None
+    self.__listeners = EventHandler()
 
   @property
-  def path(self):
-    parent = self.parent
-    if parent:
-      if isinstance(parent, RootNode):
-        return '/' + self.name
-      else:
-        return parent.path + '/' + self.name
-    return self.name
+  def active_node(self):
+    return self.__active_node() if self.__active_node else None
 
-  @property
-  def root(self):
-    """
-    Returns the #RootNode of the tree, or #None if the node is not attached to
-    a graph that contains a #RootNode.
-    """
+  @active_node.setter
+  def active_node(self, node):
+    if not isinstance(node, SceneNode):
+      raise TypeError('expected SceneNode')
+    if node.network != self:
+      raise RuntimeError('active_node must be in the same scene')
+    old_node = self.active_node
+    if node != old_node:
+      self.__active_node = weakref.ref(node)
+      data = {'new_node': node, 'old_node': old_node}
+      self.emit(self.EV_ACTIVE_NODE_CHANGED, data)
 
-    parent = self.parent
-    while parent:
-      self = parent
-      parent = self.parent
-    if isinstance(self, RootNode):
-      return self
-    return None
+  def bind(self, *args, **kwargs):
+    self.__listeners.bind(*args, **kwargs)
+
+  def emit(self, *args, **kwargs):
+    self.__listeners.emit(*args, **kwargs)
+
+  def gl_render(self):
+    #for node in self.__removed_gl_nodes:
+    #  with node.behaviour.gl_resources.as_current(release=False):
+    #    try:
+    #      node.behaviour.gl_cleanup()
+    #    except:
+    #      traceback.print_exc()
+    #self.__removed_gl_nodes.clear()
+    #self.__new_gl_nodes.clear()
+
+    gl.glClearColor(0.0, 0.0, 0.0, 1.0)
+    gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+
+    for node in self.root.iter_hierarchy():
+      if not node.implements(GLObjectInterface):
+        continue
+      with node.behaviour.gl_resources.as_current(release=False):
+        try:
+          node.behaviour.gl_render()
+        except:
+          traceback.print_exc()
+
+  def gl_cleanup(self):
+    for node in self.root.iter_hierarchy():
+      if not node.implements(GLObjectInterface):
+        continue
+      with node.behaviour.gl_resources.as_current(release=False):
+        try:
+          node.behaviour.gl_cleanup()
+        except:
+          traceback.print_exc()
+
+  # Network
+
+  def on_node_enters_network(self, node):
+    if type(node) != SceneNode:
+      raise TypeError('only SceneNodes can be added to the Scene network.')
+
+
+class SceneNode(NetworkNode):
+  """
+  Represents a node in the scene. The behaviour of the node is defined by
+  its *behaviour* object which must be an instance of a class that implements
+  the #NodeBehaviour interface.
+
+  Additionally, every node can have
+
+  * input and output slots for computed data which can be connected
+  * parameters that can be displayed in the User Interface and read/changed
+    from code
+  * listeners that are bound to certain events associated with the node (eg.
+    name or location change)
+  """
+
+  EV_UP = 'up'
+  EV_DOWN = 'down'
+  EV_LOCAL = 'local'
+
+  EV_NAME_CHANGED = 'ScenNode.EV_NAME_CHANGED'
+  EV_PARENT_CHANGED = 'ScenNode.EV_PARENT_CHANGED'
+
+  def __init__(self, network, name, behaviour):
+    if not isinstance(network, Scene):
+      raise TypeError('network must be a Scene instance')
+    if not NodeBehaviour.implemented_by(behaviour):
+      raise TypeError('must implement the NodeBehaviour interface')
+    self.__listeners = EventHandler()
+    self.params = Parameters()
+    self.inputs = InputList()
+    self.outputs = OutputList()
+    self.behaviour = behaviour
+    behaviour.node = weakref.ref(self)
+    super().__init__(network, name)
+    behaviour.node_attached(self)
+
+  def __repr__(self):
+    return '<SceneNode path={!r} behaviour={!r}>'.format(
+      self.path, self.behaviour)
+
+  scene = NetworkNode.network
 
   @property
   def scene(self):
-    root = self.root
-    if root:
-      return root.scene
-    return None
-
-  @property
-  def parent(self):
-    return self._parent() if self._parent else None
-
-  @parent.setter
-  def parent(self, parent):
-    if parent is not None and not isinstance(parent, SceneNode):
-      raise TypeError('parent must be SceneNode instance')
-    if not parent.supports_children:
-      raise RuntimeError('this scene node does not support children', parent)
-    old_path = self.path
-    old_parent = self.parent
-    self.remove()
-    if parent is not None:
-      self._parent = weakref.ref(parent)
-      parent._children.append(self)
-    self._update_name(self._name, old_parent)
-
-  @property
-  def name(self):
-    return self._name
-
-  @name.setter
-  def name(self, value):
-    self._update_name(value, self.parent)
-
-  @property
-  def children(self):
-    return self._children
-
-  def remove(self):
-    parent = self.parent
-    self._parent = None
-    if parent:
-      parent._children.remove(self)
-
-  def add(self, child):
-    if not isinstance(child, SceneNode):
-      raise TypeError('child must be SceneNode instance', child)
-    child.parent = self
-
-  def _update_name(self, name, old_parent):
-    if not isinstance(name, str):
-      raise TypeError('name bust be str', name)
-    if not name or not re.match('[A-z0-9_]+$', name):
-      raise ValueError('invalid name', name)
-
-    is_initial = not hasattr(self, '_name')
-    old_path = None if is_initial else self.path
-
-    # Make sure the name doesn't collide with that of any other node
-    # in the same parent node.
-    parent = self.parent
-    if parent:
-      # Get the desired name without numeric suffix.
-      norm_name = re.match('(.*)\d+$', name)
-      norm_name = norm_name.group(1) if norm_name else name
-      regex = re.compile(re.escape(norm_name) + '(\d+)?$')
-      highest_number = None
-
-      for child in parent.children:
-        if child == self: continue
-        match = regex.match(child._name)
-        if not match: continue
-        num = int(match.group(1) or '1')
-        if highest_number is None or num > highest_number:
-          highest_number = num
-
-      if highest_number is not None:
-        name = norm_name + str(highest_number + 1)
-
-      assert all(x._name != name for x in parent.children if x != self)
-
-    self._name = name
-
-    if not is_initial and (old_path != self.path or old_parent != self.parent):
-      ev_data = {'node': self, 'old_path': old_path, 'old_parent': old_parent}
-      self.emit(event.PATH_CHANGED, ev_data)
-      if not self.parent and old_parent:
-        old_parent.emit(event.PATH_CHANGED, ev_data)
-
-  def find_node(self, path):
     """
-    Finds a node using a path reference relative to this node.
+    An alias for the #network property.
     """
 
-    path = self.abs_path(path)
-    if not path:
-      return None
+    return self.network
 
-    node = self.root
-    if path == '/':
-      return node
-
-    for part in path.split('/')[1:]:
-      if not node:
-        break
-      if part == '..':
-        node = node.parent
-      elif part == '.':
-        pass
-      else:
-        for child in node.children:
-          if child.name == part:
-            node = child
-            break
-        else:
-          node = None
-          break
-
-    return node
-
-  def abs_path(self, path):
+  def bind(self, kind, func, global_=False):
     """
-    Converts the specified path to an absolute path.
+    Bind a function to the specified event kind. If *global_* is #True, the
+    listener will receive any events that are propagated through the
+    hierarchy, otherwise it will only be invoked if the event was actually
+    emitted by the very node it was bound with.
     """
 
-    return posixpath.normpath(posixpath.join(self.path, path))
+    if global_:
+      filter = None
+    else:
+      filter = lambda ev: ev.source == self
+    self.__listeners.bind(kind, func, filter=filter)
 
   def emit(self, kind, data, direction=None, source=None):
     """
-    Triggers an event that propagates through the scene graph in the specified
-    direction (either #event.UP, #event.DOWN or #event.LOCAL). If no direction
-    is specified, the event will propagate in both directions.
+    Emit an event that propagates through the scene graph in the specified
+    direction (either #EV_UP, #EV_DOWN or #EV_LOCAL). If no direction is
+    specified, the event will propagate both up and down.
     """
 
-    if direction not in (None, event.UP, event.DOWN, event.LOCAL):
-      raise ValueError('invalid event direction', direction)
+    if direction not in (None, self.EV_UP, self.EV_DOWN, self.EV_LOCAL):
+      raise ValueError('invalid event direction: {!r}'.format(direction))
     if source is None:
       source = self
 
-    self._listeners.emit(kind, data, source, current=self)
+    self.__listeners.emit(kind, data, source)
 
-    if direction is None or direction == event.UP:
+    if direction is None or direction == self.EV_UP:
       parent = self.parent
       if parent:
-        parent.emit(kind, data, event.UP, source)
-    if direction is None or direction == event.DOWN:
-      for child in self._children:
-        child.emit(kind, data, event.DOWN, source)
-
-  def bind(self, kind, listener, from_anywhere=False):
-    """
-    Binds a listener for the specified event kind. The listener must accept
-    an #Event object as its only argument. If *from_anywhere* is #True, then
-    the listener will be invoked for any event received even if it was not
-    triggered from this node.
-    """
-
-    self._listeners.bind(kind, listener, from_anywhere)
+        parent.emit(kind, data, self.EV_UP, source)
+    if direction is None or direction == self.EV_DOWN:
+      for child in self.children:
+        child.emit(kind, data, self.EV_DOWN, source)
 
   def implements(self, interface):
     """
@@ -276,141 +313,33 @@ class SceneNode:
     behaviour. Returns #False if the node has no behaviour attached.
     """
 
-    if self.behaviour is not None:
-      return interface.implemented_by(self.behaviour)
-    return False
+    return interface.implemented_by(self.behaviour)
 
+  # NetworkNode
 
-class RootNode(SceneNode):
-  """
-  This is a special class that represents the root scene node.
-  """
-
-  def __init__(self, scene):
-    super().__init__('', None)
-    self.supports_children = True
-    self._scene = weakref.ref(scene)
-
-  @property
-  def scene(self):
-    return self._scene()
-
-  @property
-  def name(self):
-    return '<root>'
-
-  @name.setter
+  @NetworkNode.name.setter
   def name(self, value):
-    if value != '':
-      raise ValueError('name of root node can not be set')
+    old_name = self.name
+    NetworkNode.name.__set__(self, value)
+    if old_name != self.name:
+      data = {'new_name': self.name, 'old_name': old_name}
+      self.emit(self.EV_NAME_CHANGED, data)
 
-  @property
-  def path(self):
-    return '/'
+  # TreeNode
 
-  @property
-  def parent(self):
-    return None
+  def detach(self):
+    old_parent = self.parent
+    super().detach()
+    if old_parent is not None:
+      data = {'new_parent': None, 'old_parent': old_parent}
+      self.emit(self.EV_PARENT_CHANGED, data)
 
-  @parent.setter
-  def parent(self, parent):
-    raise ValueError('RootNode can not be the child of another node.')
-
-
-class Scene:
-
-  def __init__(self):
-    self.root = RootNode(self)
-    self.filename = None
-    self.gl_context = None
-    self.active_node = None
-    self.__listeners = event.EventHandler(event.Listener)
-    self.__new_gl_nodes = set()
-    self.__removed_gl_nodes = set()
-
-    self.root.bind(event.PATH_CHANGED, self.__path_changed, True)
-
-  @property
-  def name(self):
-    if self.filename:
-      return os.path.baseame(self.filename)
-    else:
-      return 'Untitled'
-
-  def __path_changed(self, ev):
-    if ev.source.implements(GLObjectInterface) and ev['old_parent'] != ev.source.parent:
-      # Parent has changed. Has the root changed, too?
-      old_root = ev['old_parent'].root if ev['old_parent'] else None
-      if old_root != ev.source.root:
-        if old_root == self.root:
-          if ev.source in self.__new_gl_nodes:
-            self.__new_gl_nodes.discard(ev.source)
-          else:
-            self.__removed_gl_nodes.add(ev.source)
-        elif ev.source.root == self.root:
-          if ev.source in self.__removed_gl_nodes:
-            self.__removed_gl_nodes.discard(ev.source)
-          else:
-            self.__new_gl_nodes.add(ev.source)
-
-  def bind(self, kind, func):
-    self.__listeners.bind(kind, func)
-
-  def emit(self, kind, data):
-    self.__listeners.emit(kind, data, self)
-
-  def nodes(self, interface=None):
-    """
-    Returns a generator that yields all nodes in the scene. If an *interface*
-    is specified, only nodes where the behaviour implements the specified
-    interface are yielded.
-    """
-
-    def generator(node):
-      yield node
-      for child in node.children:
-        yield from generator(child)
-
-    gen = generator(self.root)
-    if interface:
-      gen = filter(lambda x: x.implements(interface), gen)
-    return gen
-
-  def set_active_node(self, node):
-    if not isinstance(node, SceneNode):
-      raise TypeError('expected SceneNode')
-    if node.root != self.root:
-      raise RuntimeError('node is not in the same root')
-    self.active_node = node
-    self.emit(event.SCENE_CHANGED, None)
-
-  def gl_cleanup(self):
-    for node in self.nodes(GLObjectInterface):
-      with node.behaviour.gl_resources.as_current(release=False):
-        try:
-          node.behaviour.gl_cleanup()
-        except:
-          traceback.print_exc()
-
-  def gl_render(self):
-    for node in self.__removed_gl_nodes:
-      with node.behaviour.gl_resources.as_current(release=False):
-        try:
-          node.behaviour.gl_cleanup()
-        except:
-          traceback.print_exc()
-    self.__removed_gl_nodes.clear()
-    self.__new_gl_nodes.clear()
-
-    gl.glClearColor(0.0, 0.0, 0.0, 1.0)
-    gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
-
-    for node in self.nodes(GLObjectInterface):
-      with node.behaviour.gl_resources.as_current(release=False):
-        try:
-          node.behaviour.gl_render()
-        except:
-          traceback.print_exc()
+  def attach_to(self, parent, *args, **kwargs):
+    old_parent = self.parent
+    super().attach_to(parent, *args, **kwargs)
+    if old_parent != parent:
+      data = {'new_parent': parent, 'old_parent': old_parent}
+      self.emit(self.EV_PARENT_CHANGED, data)
 
 
 class node_factory:
@@ -426,8 +355,8 @@ class node_factory:
     self.name = name
     node_factory.factories.append(self)
 
-  def __call__(self, name=None):
-    return SceneNode(name or self.name, self.behaviour_class())
+  def __call__(self, scene, name=None):
+    return SceneNode(scene, name or self.name, self.behaviour_class())
 
 
 def get_node_factories():

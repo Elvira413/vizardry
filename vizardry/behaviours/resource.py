@@ -20,17 +20,16 @@
 # IN THE SOFTWARE.
 
 import nr.interface
-from vizardry.core import event
-from vizardry.core.interfaces import ParameterInterface
+from vizardry.core.interfaces import NodeBehaviour
 from vizardry.core.parameters import Text
 from vizardry.core.scene import node_factory
 
 
 class ResourceBehaviour(nr.interface.Implementation):
-  nr.interface.implements(ParameterInterface)
+  nr.interface.implements(NodeBehaviour)
 
-  def node_attached(self):
-    self.params.add(Text('text', 'Text', multiline=True, syntax='plain'))
+  def node_attached(self, node):
+    node.params.add(Text('text', 'Text', multiline=True, syntax='plain'))
 
 
 Resource = node_factory(ResourceBehaviour, 'resource')

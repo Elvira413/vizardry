@@ -22,15 +22,8 @@ Vizardry uses the [`nr.interface`][nr.interface] module.
 The following node behaviour interfaces are available and recognized by
 Vizardry:
 
-* `ParameterInterface` &ndash; Allows the node to define parameters that can
-  be displayed and edited in the Vizardry parameter panel.
-
-* `ComputeInterface` &ndash; Allows to the node declare input and output slots
-  for data that can be directed into other nodes. The node will be invoked at
-  every frame (as determined by a node implementing the `TimerInterface`).
-  Many `GLObjectInterface` implementations will also want to implement this
-  interface in order to be able to read the output from other nodes (per the
-  connections set between the inputs and outputs).
+* `NodeBehaviour` &ndash; The base interface for nodes in Vizardry. Declares
+  a `node_attached()` and `compute()` method, which are optional to implement.
 
 * `GLObjectInterface` &ndash; Allows the node to render into the GL canvas.
   The default `GLInlineNode` implementation allows you to write Python code

@@ -21,8 +21,7 @@
 
 import nr.interface
 import traceback
-from vizardry.core import event
-from vizardry.core.interfaces import ParameterInterface, GLObjectInterface
+from vizardry.core.interfaces import GLObjectInterface
 from vizardry.core.parameters import Text
 from vizardry.core.scene import node_factory
 
@@ -36,7 +35,7 @@ def gl_render():
 
 
 class GLInlineBehaviour(nr.interface.Implementation):
-  nr.interface.implements(ParameterInterface, GLObjectInterface)
+  nr.interface.implements(GLObjectInterface)
 
   def __init__(self):
     super().__init__()
@@ -47,23 +46,24 @@ class GLInlineBehaviour(nr.interface.Implementation):
     Executes the Python code in the 'code' parameter.
     """
 
+    node = self.node()
     self.__scope = {}
 
     try:
-      code = compile(self.params['code'], 'vizardry:' + self.node().path, 'exec')
-      scope = {'node': self.node()}
+      code = compile(node.params['code'], 'vizardry:' + node.path, 'exec')
+      scope = {'node': node}
       exec(code, scope)
     except:
       traceback.print_exc()
     else:
       self.__scope = scope
-      self.node().emit(event.VIEWPORT_UPDATE, None)
+      node.scene.emit(node.scene.EV_VIEWPORT_UPDATE)
 
   @nr.interface.override
-  def node_attached(self):
-    self.params.add(Text('code', 'Python Code', multiline=True, syntax='python'))
-    self.params('code').bind(event.VALUE_CHANGED, lambda ev: self.__update())
-    self.params['code'] = DEFAULT_CODE
+  def node_attached(self, node):
+    node.params.add(Text('code', 'Python Code', multiline=True, syntax='python'))
+    node.params('code').bind(Text.EV_VALUE_CHANGED, lambda ev: self.__update())
+    node.params['code'] = DEFAULT_CODE
 
   @nr.interface.override
   def gl_render(self):

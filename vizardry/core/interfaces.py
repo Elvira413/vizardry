@@ -27,8 +27,6 @@ import nr.interface
 import pkg_resources
 import weakref
 import wx
-from vizardry.core.parameters import Parameters
-from vizardry.core.network import InputList, OutputList
 from vizardry.gl import ResourceManager as GLResourceManager
 
 ICON = None
@@ -55,36 +53,7 @@ class NodeBehaviour(nr.interface.Interface):
       ICON = wx.Image(pkg_resources.resource_stream('vizardry', 'res/python_file.png'))
     return ICON
 
-
-class ParameterInterface(NodeBehaviour):
-  """
-  This interface allows a node to define parameters that can be displayed and
-  edited in the Vizardry parameter panel.
-
-  For more information on parameters, check the #vizardry.core.parameters
-  package documentation.
-  """
-
-  params = nr.interface.attr(Parameters)
-
-  def __init__(self):
-    self.params = Parameters()
-
-
-class ComputeInterface(NodeBehaviour):
-  """
-  This interface allows the node to declare input and output slots for data
-  that can be computed in the #execute() callback, and connect these slots
-  with other nodes in the same network (by path references).
-  """
-
-  inputs = nr.interface.attr(InputList)
-  outputs = nr.interface.attr(OutputList)
-
-  def __init__(self):
-    self.inputs = InputList()
-    self.outputs = OutputList()
-
+  @nr.interface.default
   def compute(self):
     """
     This method is called to compute the values for the output slots of the

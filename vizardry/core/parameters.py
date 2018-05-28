@@ -24,7 +24,7 @@ This module provides the API for node parameters.
 """
 
 import wx
-from vizardry.core import event
+from vizardry.core.generics.eventhandler import EventHandler
 
 
 class Parameters:
@@ -117,10 +117,12 @@ class Parameter:
   Base class for parameters.
   """
 
+  EV_VALUE_CHANGED = 'Parameter.EV_VALUE_CHANGED'
+
   def __init__(self, name, label):
     self.name = name
     self.label = label
-    self._listeners = event.EventHandler(event.Listener)
+    self.__listeners = EventHandler()
 
   def __repr__(self):
     return '<{} name={!r} label={!r}>'.format(
@@ -131,14 +133,14 @@ class Parameter:
     Bind a listener to events that can be emitted by this parameter.
     """
 
-    self._listeners.bind(kind, func)
+    self.__listeners.bind(kind, func)
 
   def emit(self, kind, data):
     """
     Emit an event from this parameter.
     """
 
-    self._listeners.emit(kind, data, self)
+    self.__listeners.emit(kind, data, self)
 
   def create_control(self, parent):
     """
@@ -212,22 +214,22 @@ class Text(Parameter):
     self._widget = None
     self._value = ''
 
-  def __on_key(self, event):
-    if event.GetKeyCode() == wx.WXK_RETURN:
+  def __on_key(self, ev):
+    if ev.GetKeyCode() == wx.WXK_RETURN:
       if not self.multiline or wx.GetKeyState(wx.WXK_CONTROL):
         self.__commit()
         return
-    event.Skip()
+    ev.Skip()
 
-  def __on_kill_focus(self, event_obj):
-    event_obj.Skip()
+  def __on_kill_focus(self, ev):
+    ev.Skip()
     new_value = self._widget.GetValue()
     if new_value != self._value:
       self._value = new_value
-      self.emit(event.VALUE_CHANGED, None)
+      self.emit(self.EV_VALUE_CHANGED, None)
 
   def __commit(self):
-    self.emit(event.VALUE_CHANGED, None)
+    self.emit(self.EV_VALUE_CHANGED, None)
 
   # Parameter
 
